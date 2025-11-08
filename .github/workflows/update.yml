@@ -41,7 +41,7 @@ jobs:
           });
         }
         
-       // 特殊URL处理函数
+   // 特殊URL处理函数
 function processSpecialUrls(url) {
   let processedUrl = url;
   
@@ -52,6 +52,7 @@ function processSpecialUrls(url) {
   
   // 第二步：处理特殊域名（保留完整参数）
   if (processedUrl.includes('utuxx.91kds.cn')) {
+    // 确保保留所有参数：id=、ip=、pwd=、app=等
     return processedUrl;
   }
   
@@ -63,10 +64,11 @@ function processSpecialUrls(url) {
     return processedUrl;
   }
   
+  // 第三步：返回处理后的URL（无论是否特殊域名）
   return processedUrl;
 }
 
-// 主函数 - 修复丢失源版
+          // 主函数 - 修复丢失源版
         async function main() {
           console.log('开始生成直播源（修复丢失源版）...');
           const startTime = Date.now();
