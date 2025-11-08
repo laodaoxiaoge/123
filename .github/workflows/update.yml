@@ -77,14 +77,6 @@ jobs:
           if (url.includes('huya.m3u8')) {
             return url;
           }
-          
-          // 处理kdsvod协议
-          if (url.startsWith('kdsvod://')) {
-            return url.replace('kdsvod://', '');
-          }
-          
-          return url;
-        }
         
         // 主函数 - 修复丢失源版
         async function main() {
