@@ -42,29 +42,31 @@ jobs:
         }
         
         // 特殊URL处理函数
-        function processSpecialUrls(url) {
-          // 处理utuxx.91kds.cn的URL（保留所有参数）
-          if (url.includes('utuxx.91kds.cn')) {
-            return url;
-          }
-          
-          // 处理zjcn-live-play.jstv.com的URL
-          if (url.includes('zjcn-live-play.jstv.com')) {
-            return url;
-          }
-          
-          // 处理虎牙特殊URL
-          if (url.includes('huya.m3u8')) {
-            return url;
-          }
-          
-          // 处理kdsvod协议
-          if (url.startsWith('kdsvod://')) {
-            return url.replace('kdsvod://', '');
-          }
-          
-          return url;
-        }
+       function processSpecialUrls(url) {
+  let processedUrl = url;
+  
+  // 第一步：先处理协议转换
+  if (processedUrl.startsWith('kdsvod://')) {
+    processedUrl = processedUrl.replace('kdsvod://', '');
+  }
+  
+  // 第二步：处理特殊域名（保留完整参数）
+  if (processedUrl.includes('utuxx.91kds.cn')) {
+    // 确保保留所有参数：id=、ip=、pwd=、app=等
+    return processedUrl;
+  }
+  
+  if (processedUrl.includes('zjcn-live-play.jstv.com')) {
+    return processedUrl;
+  }
+  
+  if (processedUrl.includes('huya.m3u8')) {
+    return processedUrl;
+  }
+  
+  // 第三步：返回处理后的URL（无论是否特殊域名）
+  return processedUrl;
+}
         
         // 主函数 - 修复丢失源版
         async function main() {
