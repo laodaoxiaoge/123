@@ -34,9 +34,9 @@ http://zby.130519.xyz/PLTV/11/224/3221225673/1.m3u8
 http://utuxx.91kds.cn/live1/jsb.m3u8?id=cctv1hd&ip=psus01&pwd=jsdecode
 http://utuxx.91kds.cn/live1/jsb.m3u8?id=cctv1hd&ip=psus03&pwd=jsdecode
 http://zby.130519.xyz/PLTV/11/224/3221225723/1.m3u8
-http://shyd.695847.xyz/cms001/ch00000090990000001520/index.m3u8?IASHttpSessionId=
-http://shyd.695847.xyz/cms001/ch00000090990000001388/index.m3u8?IASHttpSessionId=
-http://shyd.695847.xyz/cms001/ch00000090990000001398/index.m3u8?IASHttpSessionId=
+http://shyd.695847.xyz/cms001/ch00000090990000001520/index.m3u8?IASHttpSessionId=#isVideo=true
+http://shyd.695847.xyz/cms001/ch00000090990000001388/index.m3u8?IASHttpSessionId=#isVideo=true
+http://shyd.695847.xyz/cms001/ch00000090990000001398/index.m3u8?IASHttpSessionId=#isVideo=true
 #EXTINF:-1 tvg-id="cctv2hd" tvg-name="CCTV-2HD" tvg-logo="http://tb.91kds.cn/tb1/cctv.png" group-title="央视",CCTV-2HD
 http://utuxx.91kds.cn/live1/cctv2.m3u8?id=cctv2hd&pwd=jsdecode
 http://utuxx.91kds.cn/live1/jsb.m3u8?id=cctv2hd&pwd=jsdecode
@@ -9440,6 +9440,7 @@ https://liveplay-srs.voc.com.cn/hls/tv/171_daca67.m3u8@@Referer=https://xhncloud
 https://liveplay-srs.voc.com.cn/hls/tv/204_16cb0f.m3u8@@Referer=https://xhncloud.voc.com.cn/@User-Agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36 HBPC/12.1.3.306@@
 #EXTINF:-1 tvg-id="hnyinx1" tvg-name="南县综合频道" tvg-logo="http://tb.91kds.cn/tb1/hnyinx.png" group-title="湖南",南县综合频道
 htmlplay://https://web.guangdianyun.tv/tv/?id=1724&uin=1632
+
 
 http://hnstnx.chinashadt.com:2037/live/10001.stream/playlist.m3u8
 http://hnstnx.chinashadt.com:2037/live/10001.stream_360p/playlist.m3u8
