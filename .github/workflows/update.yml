@@ -41,7 +41,7 @@ jobs:
           });
         }
         
-        // 特殊URL处理函数
+       // 特殊URL处理函数
 function processSpecialUrls(url) {
   let processedUrl = url;
   
@@ -52,20 +52,25 @@ function processSpecialUrls(url) {
   
   // 第二步：处理特殊域名（保留所有参数）
   if (processedUrl.includes('utuxx.91kds.cn')) {
-    return processedUrl; // 返回已经处理过协议转换的URL
+    return processedUrl;
   }
   
   // 处理zjcn-live-play.jstv.com的URL
   if (processedUrl.includes('zjcn-live-play.jstv.com')) {
-    return processedUrl; // 返回已经处理过协议转换的URL
+    return processedUrl;
   }
   
   // 处理虎牙特殊URL
   if (processedUrl.includes('huya.m3u8')) {
-    return processedUrl; // 返回已经处理过协议转换的URL
+    return processedUrl;
   }
   
   return processedUrl;
+}
+
+// 主函数 - 修复丢失源版
+async function main() {
+  // ... 主函数代码
 }
         
         // 主函数 - 修复丢失源版
