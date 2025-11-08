@@ -68,15 +68,7 @@ jobs:
   return processedUrl;
 }
           
-          // 处理zjcn-live-play.jstv.com的URL
-          if (url.includes('zjcn-live-play.jstv.com')) {
-            return url;
-          }
-          
-          // 处理虎牙特殊URL
-          if (url.includes('huya.m3u8')) {
-            return url;
-          }
+         
         
         // 主函数 - 修复丢失源版
         async function main() {
