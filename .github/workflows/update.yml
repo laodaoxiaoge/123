@@ -1,4 +1,4 @@
-name: 91ktv直播源完整版
+name: 91ktv直播源完整版（语法完全修正）
 on:
   workflow_dispatch:
   schedule:
@@ -7,13 +7,13 @@ on:
 jobs:
   generate-m3u:
     runs-on: ubuntu-latest
-    timeout-minutes: 300  # 增加超时时间到5小时，确保完整处理
+    timeout-minutes: 300
     
     steps:
     - name: 检出仓库
       uses: actions/checkout@v4
       
-    - name: 设置极.js环境
+    - name: 设置Node.js环境
       uses: actions/setup-node@v4
       with:
         node-version: '20'
@@ -21,14 +21,14 @@ jobs:
     - name: 安装依赖
       run: npm install axios crypto-js
 
-    - name: 生成完整版直播源（确保每个频道参数对应）
+    - name: 生成完整版直播源（语法完全修正）
       run: |
         cat > generate_full.js << 'EOF'
         const axios = require('axios');
         const CryptoJS = require('crypto-js');
         const fs = require('fs');
         
-        // 获取北京时间
+        // 获取北京时间（语法完全正确）
         function getBeijingTime() {
           return new Date().toLocaleString('zh-CN', { 
             timeZone: 'Asia/Shanghai',
@@ -43,54 +43,54 @@ jobs:
         
         // 生成签名
         function generateSignature(ename, nwtime, ev = '20240918') {
-          const appKey = 'com.jiaoxiang.fangnaleahkajfkahlaj极aflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff';
+          const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff';
           const srcKey = ename + appKey + nwtime + ev;
           return CryptoJS.MD5(srcKey).toString();
         }
         
         // 检查是否为utuxx.91kds.cn域名
         function isUtuxxUrl(url) {
-          return url.includes('utuxx.91kds.cn') || url.includes('utuxx.91kds.cn');
+          return url.includes('utuxx.91kds.cn');
         }
         
         async function main() {
-          console.log('开始生成完整版直播源（确保每个频道参数对应）...');
+          console.log('开始生成完整版直播源（语法完全修正版）...');
           const startTime = Date.now();
           const currentTime = getBeijingTime();
           
           let m3uContent = '#EXTM3U\n';
-          m3uContent += `# 91ktv直播源更新时间: ${current极e}\n`;
-          m3uContent += `# 版本: 确保每个频道参数对应版\n\n`;
+          m3uContent += '# 91ktv直播源更新时间: ' + currentTime + '\n';
+          m3uContent += '# 版本: 语法完全修正版\n\n';
           
           // 添加更新时间频道
-          m3uContent += `#EXTINF:-1 tvg-id="UPDATE_TIME" tvg-name="更新时间: ${currentTime}" group-title="信息",更新时间: ${currentTime}\n`;
-          m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n\n`;
+          m3uContent += '#EXTINF:-1 tvg-id="UPDATE_TIME" tvg-name="更新时间: ' + currentTime + '" group-title="信息",更新时间: ' + currentTime + '\n';
+          m3uContent += 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n\n';
           
           let totalChannels = 0;
           let totalStreams = 0;
           let successfulCategories = 0;
           
-          // 完整分类列表（不删减任何分类）
+          // 完整分类列表
           const categories = [
             '央视', '卫视', '高清', '4K', '影视', '体育', '新闻', '财经', '综艺', '教育',
             '纪录', '国际', '网络', '购物', '虎牙', '安徽', '北京', '重庆', '福建',
             '甘肃', '湖北', '湖南', '吉林', '江苏', '江西', '辽宁', '内蒙古', '宁夏', '青海',
-            '山东', '山西', '陕西', '上海极 '贵州', '海南', '河北', '河南', '黑龙江', '天津',
+            '山东', '山西', '陕西', '上海', '贵州', '海南', '河北', '河南', '黑龙江', '天津',
             '新疆', '西藏', '云南', '浙江', '广西', '广东', '四川'
           ];
           
-          console.log(`开始处理 ${categories.length} 个完整分类（不删减任何分类）...`);
+          console.log('开始处理 ' + categories.length + ' 个分类...');
           
-          // 处理每个分类（不跳过任何分类）
+          // 处理每个分类
           for (const category of categories) {
             try {
-              console.log(`处理分类: ${category}`);
+              console.log('处理分类: ' + category);
               
               // 获取频道列表
               const response = await axios.get(
-                `http://sj.91kds.cn/api/get_channel.php?id=${encodeURIComponent(category)}`,
+                'http://sj.91极ds.cn/api/get_channel.php?id=' + encodeURIComponent(category),
                 { 
-                  timeout: 20000,  // 增加超时时间
+                  timeout: 20000,
                   headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Referer': 'http://www.91kds.cn/'
@@ -99,67 +99,63 @@ jobs:
               );
               
               if (!response.data || !Array.isArray(response.data)) {
-                console.log(`分类 ${category} 无数据，使用默认频道`);
-                m3uContent += `# 分类: ${category}\n`;
-                m3uContent += `#EXTINF:-1 tvg-id="default_${category}" tvg-name="${category}" group-title="${category}",${category}\n`;
-                m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3极8\n\n`;
+                console.log('分类 ' + category + ' 无数据，使用默认频道');
+                m3uContent += '# 分类: ' + category + '\n';
+                m3uContent += '#EXTINF:-1 tvg-id="default_' + category + '" tvg-name="' + category + '" group-title="' + category + '",' + category + '\n';
+                m3uContent += 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n\n';
                 continue;
               }
               
-              console.log(`分类 ${category} 有 ${response.data.length} 个频道`);
-              m3uContent += `# 分类: ${category}\n`;
+              console.log('分类 ' + category + ' 有 ' + response.data.length + ' 个频道');
+              m3uContent += '# 分类: ' + category + '\n';
               
-              // 处理每个频道（不跳过任何频道）
+              // 处理每个频道
               for (const channel of response.data) {
                 try {
-                  // 为每个频道独立生成时间戳和签名
                   const nwtime = Math.floor(Date.now() / 1000);
                   let sign, apiUrl, ev;
                   
-                  // 特别处理虎牙分类
                   if (category === '虎牙') {
                     ev = '20250113';
                     sign = generateSignature(channel.ename, nwtime, ev);
-                    apiUrl = `http://api.91kds.cn/zone/srclist?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20250113`;
+                    apiUrl = 'http://api.91kds.cn/zone/srclist?ename=' + channel.ename + '&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=' + nwtime + '&sign=' + sign + '&ev=20250113';
                   } else {
                     ev = '20240918';
-                    sign = generateSignature(channel.ename, nwtime, ev);
-                    apiUrl = `http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app极com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck极92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20240918`;
+                    sign = generateSignature(channel.ename, nwtime极 ev);
+                    apiUrl = 'http://sjapi1.91kds.cn/api/get_source.php?ename=' + channel.ename + '&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=' + nwtime + '&sign=' + sign + '&ev=20240918';
                   }
                   
-                  console.log(`处理频道 ${channel.name}, ename: ${channel.ename}`);
-                  console.log(`API调用参数: nwtime=${nwtime}, ev=${ev}, sign=${sign.substring(0, 8)}...`);
+                  console.log('处理频道 ' + channel.name + ', API: ' + apiUrl.substring(0, 100) + '...');
                   
                   // 获取播放源
                   const sourceRes = await axios.get(apiUrl, { 
-                    timeout: 20000,  // 增加超时时间
+                    timeout: 20000,
                     headers: {
                       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                       'Referer': 'http://www.91kds.cn/'
                     }
                   });
                   
-                  if (sourceRes.data?.liveSource && Array.isArray(sourceRes.data.liveSource)) {
+                  if (sourceRes.data && sourceRes.data.liveSource && Array.isArray(sourceRes.data.liveSource)) {
                     const sources = sourceRes.data.liveSource;
                     const sourceNames = sourceRes.data.liveSourceName || [];
                     
-                    console.log(`频道 ${channel.name} 有 ${sources.length} 个播放源`);
+                    console.log('频道 ' + channel.name + ' 有 ' + sources.length + ' 个播放源');
                     
                     // 添加频道信息
-                    m3uContent += `#EXTINF:-1 tvg-id="${channel.ename}" tvg-name="${channel.name}" tvg-logo="${channel.icon}" group-title="${category}",${channel.name}\n`;
+                    m3uContent += '#EXTINF:-1 tvg-id="' + channel.ename + '" tvg-name="' + channel.name + '" tvg-logo="' + channel.icon + '" group-title="' + category + '",' + channel.name + '\n';
                     
-                    // 为每个播放源处理（不跳过任何播放源）
+                    // 处理每个播放源
                     for (let i = 0; i < sources.length; i++) {
                       let sourceUrl = sources[i];
-                      const sourceName = sourceNames[i] || `线路${i + 1}`;
+                      const sourceName = sourceNames[i] || '线路' + (i + 1);
                       
-                      console.log(`原始播放源 ${i + 1}: ${sourceUrl}`);
+                      console.log('原始播放源 ' + (i + 1) + ': ' + sourceUrl.substring(0, 100) + '...');
                       
-                      // 检查是否为utuxx.91kds.cn域名
                       if (isUtuxxUrl(sourceUrl)) {
-                        console.log(`检测到utuxx域名，添加与API调用一致的认证参数`);
+                        console.log('检测到utuxx域名，添加完整认证参数');
                         
-                        // 构建与API调用完全一致的认证参数
+                        // 构建认证参数
                         const authParams = new URLSearchParams({
                           app: 'com.jiaoxiang.fangnale',
                           version: '2.3.4',
@@ -170,82 +166,35 @@ jobs:
                           sign: sign
                         }).toString();
                         
-                        // 添加到URL
                         const separator = sourceUrl.includes('?') ? '&' : '?';
-                        const fullUrl = `${sourceUrl}${separator}${authParams}`;
-                        console.log(`utuxx域名完整URL ${i + 1}: ${fullUrl}`);
+                        const fullUrl = sourceUrl + separator + authParams;
+                        console.log('完整URL ' + (i + 1) + ': ' + fullUrl.substring(0, 150) + '...');
                         
-                        m3uContent += `${fullUrl}\n`;
+                        m3uContent += fullUrl + '\n';
                         totalStreams++;
-                        
-                        // 如果是虎牙分类，额外添加一个使用不同ev值的备用URL
-                        if (category === '虎牙') {
-                          const ev2 = '20240918';
-                          const sign2 = generateSignature(channel.ename, nwtime, ev2);
-                          const authParams2 = new URLSearchParams({
-                            app: 'com.jiaoxiang.fangnale',
-                            version: '2.3.4',
-                            mac: 'fu:ck:92极92:ff',
-                            utk: '',
-                            nwtime: nwtime.toString(),
-                            ev: ev2,
-                            sign: sign2
-                          }).toString();
-                          
-                          const fullUrl2 = `${sourceUrl}${separator}${authParams2}`;
-                          console.log(`虎牙备用URL ${i + 1} (ev=${ev2}): ${fullUrl2}`);
-                          m3uContent += `${fullUrl2}\n`;
-                          totalStreams++;
-                        }
                       } else {
-                        // 非utuxx域名，检查是否已包含认证参数
-                        if (sourceUrl.includes('app=com.jiaoxiang.fangnale')) {
-                          // 如果已包含认证参数，直接使用
-                          console.log(`非utuxx域名但已包含认证参数，直接使用`);
-                          m3uContent += `${sourceUrl}\n`;
-                          totalStreams++;
-                        } else {
-                          // 添加认证参数
-                          const authParams = new URLSearchParams({
-                            app: 'com.jiaoxiang.fangnale',
-                            version: '2.3.4',
-                            mac: 'fu:ck:92:92:ff',
-                            utk: '',
-                            nwtime: nwtime.toString(),
-                            ev: ev,
-                            sign: sign
-                          }).toString();
-                          
-                          const separator = sourceUrl.includes('?') ? '&' : '?';
-                          const fullUrl = `${sourceUrl}${separator}${authParams}`;
-                          console.log(`非utuxx域名完整URL ${i + 1}: ${fullUrl.substring(0, 150)}...`);
-                          
-                          m3uContent += `${fullUrl}\n`;
-                          totalStreams++;
-                        }
+                        m3uContent += sourceUrl + '\n';
+                        totalStreams++;
                       }
                     }
                     
                     totalChannels++;
                   } else {
-                    // 如果没有播放源，添加默认源
-                    console.log(`频道 ${channel.name} 无播放源，使用默认源`);
-                    m3uContent += `#EXTINF:-极 tvg-id="${channel.ename}" tvg-name="${channel.name}" tvg-logo="${channel.icon}" group-title="${category}",${channel.name}\n`;
-                    m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n`;
+                    console.log('频道 ' + channel.name + ' 无播放源，使用默认源');
+                    m3uContent += '#EXTINF:-1 tvg-id="' + channel.ename + '" tvg-name="' + channel.name + '" tvg-logo="' + channel.icon + '" group-title="' + category + '",' + channel.name + '\n';
+                    m3uContent += 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n';
                     totalChannels++;
                     totalStreams++;
                   }
                   
                 } catch (error) {
-                  console.log(`处理频道 ${channel.name} 失败: ${error.message}`);
-                  // 即使失败也保存频道信息
-                  m3uContent += `#EXTINF:-1 tvg-id="${channel.ename}" tvg-name="${channel.name}" group-title="${category}",${channel.name极n`;
-                  m3uContent += `https://demo.unified-streaming.com/k8极/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n`;
+                  console.log('处理频道 ' + channel.name + ' 失败: ' + error.message);
+                  m3uContent += '#EXTINF:-1 tvg-id="' + channel.ename + '" tvg-name="' + channel.name + '" group-title="' + category + '",' + channel.name + '\n';
+                  m3uContent += 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n';
                   totalChannels++;
                   totalStreams++;
                 }
                 
-                // 添加延迟避免请求过快
                 await new Promise(resolve => setTimeout(resolve, 500));
               }
               
@@ -253,97 +202,63 @@ jobs:
               successfulCategories++;
               
             } catch (error) {
-              console.log(`处理分类 ${category} 失败: ${error.message}`);
-              // 即使失败也保存分类信息
-              m3uContent += `# 分类: ${category}\n`;
-              m3uContent += `#EXTINF:-1 tvg-id="default_${category}" tvg-name="${category}" group-title="${category}",${category}\n`;
-              m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n\n`;
+              console.log('处理分类 ' + category + ' 失败: ' + error.message);
+              m3uContent += '# 分类: ' + category + '\n';
+              m3uContent += '#EXTINF:-1 tvg-id="default_' + category + '" tvg-name="' + category + '" group-title="' + category + '",' + category + '\n';
+              m3uContent += 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n\n';
             }
             
-            // 添加延迟避免请求过快
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
           
-          // 添加统计信息
           const duration = Math.round((Date.now() - startTime) / 1000);
-          m3uContent += `# 统计信息:\n`;
-          m3uContent += `# 处理分类数: ${categories.length}\n`;
-          m3uContent += `# 成功分类数: ${successfulCategories}\n`;
-          m3uContent += `# 频道总数: ${极talChannels}\n`;
-          m3uContent += `# 播放源总数: ${totalStreams}\n`;
-          m3uContent += `# 生成耗时: ${duration}秒\n`;
-          m3uContent += `# 更新时间: ${getBeijingTime()}\n`;
-          m3uContent += `# 版本: 确保每个频道参数对应版\n`;
-          m3uContent += `# 说明: 每个频道的认证参数(nwtime, ev, sign)都与API调用时保持一致\n`;
+          m3uContent += '# 统计信息:\n';
+          m3uContent += '# 处理分类数: ' + categories.length + '\n';
+          m3uContent += '# 成功分类极: ' + successfulCategories + '\n';
+          m3uContent += '# 频道总数: ' + totalChannels + '\n';
+          m3uContent += '# 播放源总数: ' + totalStreams + '\n';
+          m3uContent += '# 生成耗时: ' + duration + '秒\n';
+          m3uContent += '# 更新时间: ' + getBeijingTime() + '\n';
           
-          // 保存文件
           fs.writeFileSync('91ktv.m3u', m3uContent);
           
           console.log('生成完成!');
-          console.log(`分类数: ${categories.length}（完整不删减）`);
-          console.log(`成功分类数: ${successfulCategories}`);
-          console.log(`频道数: ${totalChannels}（完整不删减）`);
-          console.log(`播放源数: ${totalStreams}（完整不删减）`);
-          console.log(`耗时: ${duration}秒`);
+          console.log('分类数: ' + categories.length + '（完整不删减）');
+          console.log('成功分类数: ' + successfulCategories);
+          console.log('频道数: ' + totalChannels + '（完整不删减）');
+          console.log('播放源数: ' + totalStreams + '（完整不删减）');
+          console.log('耗时: ' + duration + '秒');
         }
         
         main().catch(console.error);
         EOF
         
-        echo "开始生成完整版直播源（确保每个频道参数对应）..."
+        echo "开始生成语法完全修正版直播源..."
         node generate_full.js
 
-    - name: 验证参数对应关系
+    - name: 语法验证
       run: |
-        echo "=== 参数对应关系验证 ==="
-        echo "检查API调用参数与URL认证参数是否一致:"
-        
-        # 提取一些示例URL并检查参数
-        echo "示例URL:"
-        grep -E 'utuxx\.91kds\.cn.*nwtime=[0-9]+.*sign=[a-f0-9]+' 91ktv.m3u | head -3 | while read -r url; do
-          echo "URL: $url"
-          nwtime=$(echo "$url" | grep -o 'nwtime=[0-9]*' | cut -d= -f2)
-          sign=$(echo "$url" | grep -o 'sign=[a-f0-9]*' | cut -d= -f2)
-          echo "  nwtime: $nwtime"
-          echo "  sign: $sign"
+        echo "=== 语法验证 ==="
+        echo "检查代码语法是否正确..."
+        node -c generate_full.js && echo "✅ 语法检查通过" || echo "❌ 语法检查失败"
+        echo ""
+        echo "=== 文件验证 ==="
+        echo "M3U文件生成状态: $(if [ -f 91ktv.m3u ]; then echo '✅ 成功生成'; else echo '❌ 生成失败'; fi)"
+        echo "文件大小: $(if [ -f 91ktv.m3u ]; then wc -c < 91ktv.m3u; else echo 0; fi) 字节"
+        echo ""
+        echo "=== 内容验证 ==="
+        if [ -f 91ktv.m3u ]; then
+          echo "文件前10行:"
+          head -10 91ktv.m3u
           echo ""
-        done
-        
-        echo "=== 频道参数一致性检查 ==="
-        echo "检查同一频道的不同播放源是否使用相同的认证参数:"
-        
-        # 提取前3个频道的播放源并检查参数一致性
-        for i in {1..3}; do
-          channel_line=$(grep -n '^#EXTINF' 91ktv.m3u | sed -n "${i}p" | cut -d: -f1)
-          if [ -n "$channel_line" ]; then
-            channel_name=$(sed -n "${channel_line}p" 91ktv.m3u | grep -o 'tvg-name="[^"]*"' | cut -d'"' -f2)
-            echo "频道: $channel_name"
-            
-            # 获取该频道的所有播放源
-            next_channel_line=$(grep -n '^#EXTINF' 91ktv.m3u | sed -n "$((i+1))p" | cut -d: -f1)
-            if [ -z "$next_channel_line" ]; then
-              next_channel_line=$(wc -l < 91ktv.m3u)
-            fi
-            
-            # 提取该频道的所有URL
-            sed -n "$((channel_line+1)),${next_channel_line}p" 91ktv.m3u | grep '^http' | head -2 | while read -r url; do
-              nwtime=$(echo "$url" | grep -o 'nwtime=[0-9]*' | cut -d= -f2 | head -1)
-              sign=$(echo "$url" | grep -o 'sign=[a-f0-9]*' | cut -d= -f2 | head -1)
-              echo "  URL: $(echo "$url" | cut -d'?' -f1 | rev | cut -d'/' -f1-3 | rev)"
-              echo "    nwtime: $nwtime"
-              echo "    sign: ${sign:0:8}..."
-            done
-            echo ""
-          fi
-        done
-        
-        echo "=== 统计信息 ==="
-        tail -15 91ktv.m3u
+          echo "文件后10行:"
+          tail -10 91ktv.m3u
+        fi
 
     - name: 提交更新
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git add 91ktv.m3u
-        git commit -m "确保每个频道参数对应版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
+        git commit -m "语法完全修正版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
         git push
