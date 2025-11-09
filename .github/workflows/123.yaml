@@ -1,0 +1,240 @@
+name: 诊断API源头问题
+on: [workflow_dispatch]
+
+jobs:
+  diagnose-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: 检出仓库
+      uses: actions/checkout@v4
+      
+    - name: 设置Node.js环境
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: 安装依赖
+      run: npm install axios crypto-js
+
+    - name: 诊断API返回的原始URL
+      run: |
+        cat > diagnose.js << 'EOF'
+        const axios = require('axios');
+        const CryptoJS = require('crypto-js');
+        
+        async function diagnoseAPI() {
+          console.log('=== 开始诊断API返回的原始URL ===\n');
+          
+          // 测试一个具体的分类和频道
+          const testCategory = '央视';
+          const testChannelName = 'CCTV-1综合';
+          
+          console.log(`测试分类: ${testCategory}`);
+          console.log(`测试频道: ${testChannelName}\n`);
+          
+          try {
+            // 1. 获取频道列表
+            console.log('1. 获取频道列表...');
+            const channelResponse = await axios.get(
+              `http://sj.91kds.cn/api/get_channel.php?id=${encodeURIComponent(testCategory)}`,
+              { 
+                timeout: 10000,
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                  'Referer': 'http://www.91kds.cn/'
+                }
+              }
+            );
+            
+            console.log(`频道API响应状态: ${channelResponse.status}`);
+            console.log(`频道API响应数据长度: ${JSON.stringify(channelResponse.data).length} 字符\n`);
+            
+            if (!channelResponse.data || !Array.isArray(channelResponse.data)) {
+              console.log('❌ 频道API返回数据格式错误');
+              return;
+            }
+            
+            console.log(`找到 ${channelResponse.data.length} 个频道`);
+            
+            // 查找测试频道
+            const testChannel = channelResponse.data.find(ch => ch.name.includes(testChannelName) || ch.name.includes('CCTV1'));
+            if (!testChannel) {
+              console.log(`❌ 未找到频道 ${testChannelName}，使用第一个频道代替`);
+              // 使用第一个频道
+              if (channelResponse.data.length > 0) {
+                const firstChannel = channelResponse.data[0];
+                await testChannelSources(firstChannel);
+              }
+            } else {
+              await testChannelSources(testChannel);
+            }
+            
+          } catch (error) {
+            console.log(`❌ API请求失败: ${error.message}`);
+          }
+        }
+        
+        async function testChannelSources(channel) {
+          console.log(`\\n2. 测试频道: ${channel.name} (${channel.ename})`);
+          
+          const nwtime = Math.floor(Date.now() / 1000);
+          const srcKey = `${channel.ename}com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff${nwtime}20240918`;
+          const sign = CryptoJS.MD5(srcKey).toString();
+          
+          console.log(`请求参数:`);
+          console.log(`  ename: ${channel.ename}`);
+          console.log(`  nwtime: ${nwtime}`);
+          console.log(`  sign: ${sign}`);
+          console.log(`  完整URL: http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20240918`);
+          
+          try {
+            const sourceRes = await axios.get(
+              `http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20240918`,
+              { 
+                timeout: 10000,
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                  'Referer': 'http://www.91kds.cn/'
+                }
+              }
+            );
+            
+            console.log(`\\n3. 源API响应状态: ${sourceRes.status}`);
+            console.log(`响应头:`, JSON.stringify(sourceRes.headers, null, 2));
+            
+            if (!sourceRes.data) {
+              console.log('❌ 源API返回空数据');
+              return;
+            }
+            
+            console.log(`\\n4. 完整的API响应数据:`);
+            console.log(JSON.stringify(sourceRes.data, null, 2));
+            
+            if (sourceRes.data.liveSource && Array.isArray(sourceRes.data.liveSource)) {
+              console.log(`\\n5. 找到 ${sourceRes.data.liveSource.length} 个播放源:`);
+              
+              sourceRes.data.liveSource.forEach((url, index) => {
+                console.log(`\\n--- 源 ${index + 1} ---`);
+                console.log(`完整URL: ${url}`);
+                console.log(`URL长度: ${url.length} 字符`);
+                
+                // 分析URL结构
+                if (url.includes('?')) {
+                  const [base, query] = url.split('?');
+                  const [queryPart, fragment] = query.includes('#') ? query.split('#') : [query, ''];
+                  console.log(`基础URL: ${base}`);
+                  console.log(`查询参数: ${queryPart}`);
+                  if (fragment) console.log(`片段标识: ${fragment}`);
+                  
+                  // 解析查询参数
+                  const params = new URLSearchParams(queryPart);
+                  console.log(`解析的参数:`);
+                  for (let [key, value] of params) {
+                    console.log(`  ${key}=${value}`);
+                  }
+                }
+                
+                if (url.includes('#')) {
+                  const fragment = url.split('#')[1];
+                  console.log(`片段参数: ${fragment}`);
+                }
+                
+                // 检查关键参数
+                console.log(`包含#isVideo=true: ${url.includes('#isVideo=true')}`);
+                console.log(`包含app参数: ${url.includes('app=')}`);
+                console.log(`包含kdsvod://: ${url.includes('kdsvod://')}`);
+                console.log(`包含utuxx.91kds.cn: ${url.includes('utuxx.91kds.cn')}`);
+              });
+              
+              console.log(`\\n6. liveSourceName:`, sourceRes.data.liveSourceName);
+              
+            } else {
+              console.log('❌ 没有找到liveSource数据');
+              console.log('响应数据结构:', Object.keys(sourceRes.data));
+            }
+            
+          } catch (error) {
+            console.log(`❌ 源API请求失败: ${error.message}`);
+            if (error.response) {
+              console.log(`响应状态: ${error.response.status}`);
+              console.log(`响应头:`, error.response.headers);
+              console.log(`响应数据:`, error.response.data);
+            }
+          }
+        }
+        
+        diagnoseAPI().catch(console.error);
+        EOF
+        
+        echo "开始诊断API返回的原始URL..."
+        node diagnose.js
+
+    - name: 检查处理函数的影响
+      run: |
+        cat > test_processing.js << 'EOF'
+        const CryptoJS = require('crypto-js');
+        
+        // 测试各种URL处理场景
+        function testURLProcessing() {
+          console.log('=== 测试URL处理函数 ===\\n');
+          
+          // 模拟API可能返回的各种URL格式
+          const testURLs = [
+            // 包含完整参数的kdsvod URL
+            'kdsvod://http://utuxx.91kds.cn/live1/jsb.m3u8?id=cctv1hd&ip=psus03&pwd=jsdecode#isVideo=true&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu%3Ack%3A92%3A92%3Aff&nwtime=1762576806&ev=20250113&sign=0b752332004b66489a3b55683200de45',
+            
+            // 普通HTTP URL
+            'http://example.com/stream.m3u8#isVideo=true',
+            
+            // 只有查询参数的URL
+            'http://example.com/stream.m3u8?token=abc123',
+            
+            // 复杂URL
+            'kdsvod://http://utuxx.91kds.cn/live1/abc.m3u8?channel=test#isVideo=true'
+          ];
+          
+          // 原始处理函数（有问题的版本）
+          function processSpecialUrlsOld(url) {
+            if (url.includes('utuxx.91kds.cn')) {
+              return url;
+            }
+            if (url.startsWith('kdsvod://')) {
+              return url.replace('kdsvod://', '');
+            }
+            return url;
+          }
+          
+          // 修正后的处理函数
+          function processSpecialUrlsNew(url) {
+            let processedUrl = url;
+            if (processedUrl.startsWith('kdsvod://')) {
+              processedUrl = processedUrl.replace('kdsvod://', '');
+            }
+            if (processedUrl.includes('utuxx.91kds.cn')) {
+              return processedUrl;
+            }
+            return processedUrl;
+          }
+          
+          testURLs.forEach((url, index) => {
+            console.log(`\\n--- 测试URL ${index + 1} ---`);
+            console.log(`原始URL: ${url}`);
+            console.log(`URL长度: ${url.length}`);
+            
+            const resultOld = processSpecialUrlsOld(url);
+            const resultNew = processSpecialUrlsNew(url);
+            
+            console.log(`旧函数结果: ${resultOld}`);
+            console.log(`新函数结果: ${resultNew}`);
+            console.log(`参数是否完整: ${resultNew.includes('#isVideo=true') ? '✅' : '❌'}`);
+            console.log(`处理是否正确: ${resultOld === resultNew ? '✅相同' : '❌不同'}`);
+          });
+        }
+        
+        testURLProcessing();
+        EOF
+        
+        echo "测试URL处理函数..."
+        node test_processing.js
