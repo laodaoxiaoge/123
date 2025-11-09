@@ -137,18 +137,27 @@ jobs:
                   const nwtime = Math.floor(Date.now() / 1000);
                   let sign, apiUrl, ev;
                   
-                  // 特别处理虎牙分类
+                  // 特别处理虎牙分类 - 使用两个不同的ev值分别生成签名
                   if (category === '虎牙') {
+                    // 使用ev=20250113生成第一个签名
                     ev = '20250113';
                     sign = generateSignature(channel.ename, nwtime, ev);
                     apiUrl = `http://api.91kds.cn/zone/srclist?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20250113`;
+                    
+                    console.log(`虎牙频道 ${channel.name} 使用ev=20250113生成签名: ${sign}`);
+                    
+                    // 同时使用ev=20240918生成第二个签名作为备用
+                    const ev2 = '20240918';
+                    const sign2 = generateSignature(channel.ename, nwtime, ev2);
+                    console.log(`虎牙频道 ${channel.name} 使用ev=20240918生成备用签名: ${sign2}`);
+                    
                   } else {
                     ev = '20240918';
                     sign = generateSignature(channel.ename, nwtime, ev);
                     apiUrl = `http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20240918`;
+                    
+                    console.log(`普通频道 ${channel.name} 使用ev=20240918生成签名: ${sign.substring(0, 8)}...`);
                   }
-                  
-                  console.log(`处理频道 ${channel.name} 签名: ${sign.substring(0, 8)}...`);
                   
                   // 获取播放源
                   const sourceRes = await axios.get(apiUrl, { 
@@ -175,13 +184,26 @@ jobs:
                       
                       console.log(`原始URL ${i + 1}: ${sourceUrl.substring(0, 100)}...`);
                       
-                      // 为URL添加完整认证参数
-                      const fullUrl = addFullAuthParams(sourceUrl, channel.ename, nwtime, ev);
-                      console.log(`完整认证URL ${i + 1}: ${fullUrl.substring(0, 150)}...`);
-                      
-                      // 添加播放源
-                      m3uContent += `${fullUrl}\n`;
-                      totalStreams++;
+                      // 如果是虎牙分类，同时添加使用两个不同ev值的URL
+                      if (category === '虎牙') {
+                        // 添加使用ev=20250113的URL
+                        const fullUrl1 = addFullAuthParams(sourceUrl, channel.ename, nwtime, '20250113');
+                        console.log(`虎牙URL ${i + 1} (ev=20250113): ${fullUrl1.substring(0, 150)}...`);
+                        m3uContent += `${fullUrl1}\n`;
+                        totalStreams++;
+                        
+                        // 同时添加使用ev=20240918的备用URL
+                        const fullUrl2 = addFullAuthParams(sourceUrl, channel.ename, nwtime, '20240918');
+                        console.log(`虎牙备用URL ${i + 1} (ev=20240918): ${fullUrl2.substring(0, 150)}...`);
+                        m3uContent += `${fullUrl2}\n`;
+                        totalStreams++;
+                      } else {
+                        // 普通分类只添加一个URL
+                        const fullUrl = addFullAuthParams(sourceUrl, channel.ename, nwtime, ev);
+                        console.log(`完整认证URL ${i + 1}: ${fullUrl.substring(0, 150)}...`);
+                        m3uContent += `${fullUrl}\n`;
+                        totalStreams++;
+                      }
                     }
                     
                     totalChannels++;
@@ -235,7 +257,7 @@ jobs:
           m3uContent += `# 说明: 为每个播放URL添加完整的认证参数\n`;
           m3uContent += `# 认证参数: app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&utk=&nwtime=...&ev=...&sign=...\n`;
           m3uContent += `# 普通分类: ev=20240918\n`;
-          m3uContent += `# 虎牙分类: ev=20250113\n`;
+          m3uContent += `# 虎牙分类: 同时使用ev=20250113和ev=20240918生成签名\n`;
           
           // 保存文件
           fs.writeFileSync('91ktv.m3u', m3uContent);
@@ -282,5 +304,5 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git add 91ktv.m3u
-        git commit -m "完整版直播源更新（不删减任何分类和频道） $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
+        git commit -m "完整版直播源更新（虎牙分类使用双重签名） $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
         git push
