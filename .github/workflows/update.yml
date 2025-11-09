@@ -21,7 +21,7 @@ jobs:
     - name: 安装依赖
       run: npm install axios crypto-js
 
-    - name: 生成完整版直播源（不删减任何内容）
+    - name: 生成完整版直播源（修复虎牙ID参数）
       run: |
         cat > generate_full.js << 'EOF'
         const axios = require('axios');
@@ -48,8 +48,8 @@ jobs:
           return CryptoJS.MD5(srcKey).toString();
         }
         
-        // 为URL添加完整认证参数
-        function addFullAuthParams(baseUrl, ename, nwtime, ev = '20240918') {
+        // 为URL添加完整认证参数（特别处理虎牙分类）
+        function addFullAuthParams(baseUrl, ename, nwtime, ev = '20240918', isHuya = false) {
           const sign = generateSignature(ename, nwtime, ev);
           
           // 解析基础URL
@@ -72,17 +72,27 @@ jobs:
             sign: sign
           }).toString();
           
+          // 如果是虎牙分类，添加id参数
+          if (isHuya) {
+            // 从ename中提取id（假设ename格式为"huya11342412"）
+            const idMatch = ename.match(/huya(\d+)/);
+            if (idMatch && idMatch[1]) {
+              const id = idMatch[1];
+              return `${url}${separator}id=${id}&${authParams}`;
+            }
+          }
+          
           return `${url}${separator}${authParams}`;
         }
         
         async function main() {
-          console.log('开始生成完整版直播源（不删减任何分类和频道）...');
+          console.log('开始生成完整版直播源（修复虎牙ID参数）...');
           const startTime = Date.now();
           const currentTime = getBeijingTime();
           
           let m3uContent = '#EXTM3U\n';
           m3uContent += `# 91ktv直播源更新时间: ${currentTime}\n`;
-          m3uContent += `# 版本: 完整版 - 不删减任何分类和频道\n\n`;
+          m3uContent += `# 版本: 修复虎牙ID参数版\n\n`;
           
           // 添加更新时间频道
           m3uContent += `#EXTINF:-1 tvg-id="UPDATE_TIME" tvg-name="更新时间: ${currentTime}" group-title="信息",更新时间: ${currentTime}\n`;
@@ -124,7 +134,7 @@ jobs:
                 console.log(`分类 ${category} 无数据，使用默认频道`);
                 m3uContent += `# 分类: ${category}\n`;
                 m3uContent += `#EXTINF:-1 tvg-id="default_${category}" tvg-name="${category}" group-title="${category}",${category}\n`;
-                m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n\n`;
+                m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/极ars-of-steel/tears-of-steel.ism/.m3u8\n\n`;
                 continue;
               }
               
@@ -136,27 +146,21 @@ jobs:
                 try {
                   const nwtime = Math.floor(Date.now() / 1000);
                   let sign, apiUrl, ev;
+                  const isHuya = category === '虎牙';
                   
-                  // 特别处理虎牙分类 - 使用两个不同的ev值分别生成签名
-                  if (category === '虎牙') {
-                    // 使用ev=20250113生成第一个签名
+                  // 特别处理虎牙分类
+                  if (isHuya) {
                     ev = '20250113';
                     sign = generateSignature(channel.ename, nwtime, ev);
                     apiUrl = `http://api.91kds.cn/zone/srclist?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20250113`;
                     
-                    console.log(`虎牙频道 ${channel.name} 使用ev=20250113生成签名: ${sign}`);
-                    
-                    // 同时使用ev=20240918生成第二个签名作为备用
-                    const ev2 = '20240918';
-                    const sign2 = generateSignature(channel.ename, nwtime, ev2);
-                    console.log(`虎牙频道 ${channel.name} 使用ev=20240918生成备用签名: ${sign2}`);
-                    
+                    console.log(`虎牙频道 ${channel.name} 生成签名: ${sign}`);
                   } else {
                     ev = '20240918';
                     sign = generateSignature(channel.ename, nwtime, ev);
                     apiUrl = `http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20240918`;
                     
-                    console.log(`普通频道 ${channel.name} 使用ev=20240918生成签名: ${sign.substring(0, 8)}...`);
+                    console.log(`普通频道 ${channel.name} 生成签名: ${sign.substring(0, 8)}...`);
                   }
                   
                   // 获取播放源
@@ -184,24 +188,20 @@ jobs:
                       
                       console.log(`原始URL ${i + 1}: ${sourceUrl.substring(0, 100)}...`);
                       
-                      // 如果是虎牙分类，同时添加使用两个不同ev值的URL
-                      if (category === '虎牙') {
-                        // 添加使用ev=20250113的URL
-                        const fullUrl1 = addFullAuthParams(sourceUrl, channel.ename, nwtime, '20250113');
-                        console.log(`虎牙URL ${i + 1} (ev=20250113): ${fullUrl1.substring(0, 150)}...`);
-                        m3uContent += `${fullUrl1}\n`;
-                        totalStreams++;
-                        
-                        // 同时添加使用ev=20240918的备用URL
-                        const fullUrl2 = addFullAuthParams(sourceUrl, channel.ename, nwtime, '20240918');
-                        console.log(`虎牙备用URL ${i + 1} (ev=20240918): ${fullUrl2.substring(0, 150)}...`);
+                      // 为URL添加完整认证参数（特别处理虎牙分类）
+                      const fullUrl = addFullAuthParams(sourceUrl, channel.ename, nwtime, ev, isHuya);
+                      console.log(`完整认证URL ${i + 1}: ${fullUrl.substring(0, 150)}...`);
+                      
+                      // 添加播放源
+                      m3uContent += `${fullUrl}\n`;
+                      totalStreams++;
+                      
+                      // 如果是虎牙分类，额外添加一个使用不同ev值的URL
+                      if (isHuya) {
+                        const ev2 = '20240918';
+                        const fullUrl2 = addFullAuthParams(sourceUrl, channel.ename, nwtime, ev2, isHuya);
+                        console.log(`虎牙备用URL ${i + 1} (ev=${ev2}): ${fullUrl2.substring(0, 150)}...`);
                         m3uContent += `${fullUrl2}\n`;
-                        totalStreams++;
-                      } else {
-                        // 普通分类只添加一个URL
-                        const fullUrl = addFullAuthParams(sourceUrl, channel.ename, nwtime, ev);
-                        console.log(`完整认证URL ${i + 1}: ${fullUrl.substring(0, 150)}...`);
-                        m3uContent += `${fullUrl}\n`;
                         totalStreams++;
                       }
                     }
@@ -246,18 +246,16 @@ jobs:
           
           // 添加统计信息
           const duration = Math.round((Date.now() - startTime) / 1000);
-          m3uContent += `# 统计信息:\n`;
+          m3极Content += `# 统计信息:\n`;
           m3uContent += `# 处理分类数: ${categories.length}\n`;
           m3uContent += `# 成功分类数: ${successfulCategories}\n`;
           m3uContent += `# 频道总数: ${totalChannels}\n`;
           m3uContent += `# 播放源总数: ${totalStreams}\n`;
           m3uContent += `# 生成耗时: ${duration}秒\n`;
           m3uContent += `# 更新时间: ${getBeijingTime()}\n`;
-          m3uContent += `# 版本: 完整版 - 不删减任何分类和频道\n`;
-          m3uContent += `# 说明: 为每个播放URL添加完整的认证参数\n`;
-          m3uContent += `# 认证参数: app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&utk=&nwtime=...&ev=...&sign=...\n`;
-          m3uContent += `# 普通分类: ev=20240918\n`;
-          m3uContent += `# 虎牙分类: 同时使用ev=20250113和ev=20240918生成签名\n`;
+          m3uContent += `# 版本: 修复虎牙ID参数版\n`;
+          m3uContent += `# 说明: 为虎牙分类添加id参数\n`;
+          m3uContent += `# 虎牙URL格式: http://utuxx.91kds.cn/live1/huya.m3u8?id=11342412&app=...\n`;
           
           // 保存文件
           fs.writeFileSync('91ktv.m3u', m3uContent);
@@ -273,28 +271,20 @@ jobs:
         main().catch(console.error);
         EOF
         
-        echo "开始生成完整版直播源（不删减任何分类和频道）..."
+        echo "开始生成完整版直播源（修复虎牙ID参数）..."
         node generate_full.js
 
-    - name: 验证完整性
+    - name: 验证虎牙ID参数
       run: |
-        echo "=== 完整性验证 ==="
-        echo "文件大小: $(wc -c < 91ktv.m3u) 字节"
-        echo "总行数: $(wc -l < 91ktv.m3u)"
-        echo "播放源数量: $(grep -c '^http' 91ktv.m3u)"
-        echo "频道数量: $(grep -c '^#EXTINF' 91ktv.m3u)"
-        echo ""
-        echo "=== 认证参数验证 ==="
-        echo "包含完整认证参数的URL数量: $(grep -c 'app=com\.jiaoxiang\.fangnale' 91ktv.m3u)"
-        echo "包含utuxx.91kds.cn的URL数量: $(grep -c 'utuxx\.91kds\.cn' 91ktv.m3u)"
-        echo "包含完整签名的URL数量: $(grep -c 'sign=' 91ktv.m3u)"
-        echo ""
-        echo "=== 分类完整性验证 ==="
-        echo "处理的所有分类:"
-        grep -o 'group-title="[^"]*"' 91ktv.m3u | sort | uniq -c | head -20
+        echo "=== 虎牙ID参数验证 ==="
+        echo "检查虎牙分类的URL是否包含id参数:"
+        grep -A10 'group-title="虎牙"' 91ktv.m3u | grep 'id=' | head -3
         echo ""
         echo "=== 示例URL（检查格式）==="
-        grep -E 'utuxx\.91kds\.cn.*app=com\.jiaoxiang\.fangnale' 91ktv.m3u | head -3
+        grep -E 'utuxx\.91kds\.cn.*id=[0-9]+' 91ktv.m3u | head -3
+        echo ""
+        echo "=== 完整示例 ==="
+        grep -E 'utuxx\.91kds\.cn.*id=[0-9]+.*app=com\.jiaoxiang\.fangnale' 91ktv.m3u | head -1
         echo ""
         echo "=== 统计信息 ==="
         tail -15 91ktv.m3u
@@ -304,5 +294,5 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git add 91ktv.m3u
-        git commit -m "完整版直播源更新（虎牙分类使用双重签名） $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
+        git commit -m "修复虎牙ID参数版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
         git push
