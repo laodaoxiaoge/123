@@ -1,8 +1,8 @@
-name: 准确诊断API源头问题
+name: 完整参数诊断
 on: [workflow_dispatch]
 
 jobs:
-  accurate-diagnose:
+  full-param-diagnose:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     
@@ -18,18 +18,17 @@ jobs:
     - name: 安装依赖
       run: npm install axios crypto-js
 
-    - name: 准确诊断API返回数据
+    - name: 完整参数诊断
       run: |
-        cat > accurate_diagnose.js << 'EOF'
+        cat > full_param_diagnose.js << 'EOF'
         const axios = require('axios');
         const CryptoJS = require('crypto-js');
         
-        async function accurateDiagnose() {
-          console.log('=== 准确诊断API返回数据 ===\n');
+        async function fullParamDiagnose() {
+          console.log('=== 完整参数诊断（不隐藏任何参数） ===\n');
           
           try {
-            // 直接获取央视分类的频道数据
-            console.log('1. 获取央视分类频道列表...');
+            // 获取央视分类的频道数据
             const response = await axios.get(
               'http://sj.91kds.cn/api/get_channel.php?id=央视',
               { 
@@ -40,8 +39,6 @@ jobs:
                 }
               }
             );
-            
-            console.log(`频道API响应状态: ${response.status}`);
             
             if (!response.data || !Array.isArray(response.data)) {
               console.log('❌ 频道API返回数据格式错误');
@@ -52,7 +49,7 @@ jobs:
             
             // 取前3个频道进行测试
             for (const channel of response.data.slice(0, 3)) {
-              await testChannelSources(channel);
+              await testChannelWithFullParams(channel);
             }
             
           } catch (error) {
@@ -60,11 +57,11 @@ jobs:
           }
         }
         
-        async function testChannelSources(channel) {
+        async function testChannelWithFullParams(channel) {
           console.log(`\n--- 测试频道: ${channel.name} (${channel.ename}) ---`);
           
           const nwtime = Math.floor(Date.now() / 1000);
-          const sign = CryptoJS.MD5(`${channel.ename}com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff${nwtime}20240918`).toString();
+          const sign = CryptoJS.MD5(`${channel.ename}com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuqu极ikangbuzhu2.3.4fu:ck:92:92:ff${nwtime}20240918`).toString();
           
           try {
             const sourceRes = await axios.get(
@@ -78,35 +75,48 @@ jobs:
               }
             );
             
-            console.log(`源API响应状态: ${sourceRes.status}`);
-            
             if (sourceRes.data?.liveSource && Array.isArray(sourceRes.data.liveSource)) {
               console.log(`频道 ${channel.name} 有 ${sourceRes.data.liveSource.length} 个播放源:`);
               
               sourceRes.data.liveSource.forEach((url, index) => {
                 console.log(`\n--- 源 ${index + 1} ---`);
+                
+                // 关键修改：不隐藏任何参数，显示完整URL
                 console.log(`完整URL: ${url}`);
                 console.log(`URL长度: ${url.length} 字符`);
                 
-                // 分析URL类型
-                if (url.includes('kdsvod://')) {
-                  console.log('协议类型: kdsvod://');
-                  console.log('处理后URL:', url.replace('kdsvod://', ''));
-                } else if (url.includes('http://') || url.includes('https://')) {
-                  console.log('协议类型: HTTP/HTTPS');
-                } else {
-                  console.log('协议类型: 其他');
+                // 处理函数
+                function processSpecialUrls(url) {
+                  if (url.startsWith('kdsvod://')) {
+                    return url.replace('kdsvod://', '');
+                  }
+                  return url;
                 }
                 
-                // 检查关键参数
-                console.log(`包含id参数: ${url.includes('id=') ? '✅' : '❌'}`);
-                console.log(`包含pwd参数: ${url.includes('pwd=') ? '✅' : '❌'}`);
-                console.log(`包含#isVideo=true: ${url.includes('#isVideo=true') ? '✅' : '❌'}`);
-                console.log(`包含app参数: ${url.includes('app=') ? '✅' : '❌'}`);
+                const processedUrl = processSpecialUrls(url);
+                console.log(`处理后URL: ${processedUrl}`);
                 
-                // 检查域名
-                console.log(`包含utuxx.91kds.cn: ${url.includes('utuxx.91kds.cn') ? '✅' : '❌'}`);
-                console.log(`包含shyd.695847.xyz: ${url.includes('shyd.695847.xyz') ? '✅' : '❌'}`);
+                // 检查参数完整性（基于实际参数，而不是隐藏的***）
+                const hasId = url.includes('id=');
+                const hasPwd = url.includes('pwd=');
+                const hasIsVideo = url.includes('#isVideo=true');
+                const hasApp = url.includes('app=');
+                
+                console.log(`包含id参数: ${hasId ? '✅' : '❌'}`);
+                console.log(`包含pwd参数: ${hasPwd ? '✅' : '❌'}`);
+                console.log(`包含#isVideo=true: ${hasIsVideo ? '✅' : '❌'}`);
+                console.log(`包含app参数: ${hasApp ? '✅' : '❌'}`);
+                
+                // 判断参数是否完整
+                let isComplete = true;
+                if (url.includes('utuxx.91kds.cn')) {
+                  // 对于utuxx.91kds.cn的URL，我们希望有id和pwd参数
+                  if (!hasId || !hasPwd) {
+                    isComplete = false;
+                  }
+                }
+                
+                console.log(`参数是否完整: ${isComplete ? '✅' : '❌'}`);
               });
             }
             
@@ -115,67 +125,8 @@ jobs:
           }
         }
         
-        accurateDiagnose().catch(console.error);
+        fullParamDiagnose().catch(console.error);
         EOF
         
-        echo "开始准确诊断API返回数据..."
-        node accurate_diagnose.js
-
-    - name: 验证处理函数
-      run: |
-        cat > verify_processing.js << 'EOF'
-        // 使用真实的API数据测试处理函数
-        const axios = require('axios');
-        const CryptoJS = require('crypto-js');
-        
-        async function testWithRealData() {
-          console.log('=== 使用真实数据测试处理函数 ===\n');
-          
-          try {
-            // 获取真实数据
-            const response = await axios.get(
-              'http://sj.91kds.cn/api/get_channel.php?id=央视',
-              { timeout: 10000 }
-            );
-            
-            if (!response.data || !Array.isArray(response.data)) return;
-            
-            // 取第一个频道
-            const channel = response.data[0];
-            const nwtime = Math.floor(Date.now() / 1000);
-            const sign = CryptoJS.MD5(`${channel.ename}com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff${nwtime}20240918`).toString();
-            
-            const sourceRes = await axios.get(
-              `http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20240918`,
-              { timeout: 10000 }
-            );
-            
-            if (sourceRes.data?.liveSource) {
-              console.log('原始API返回的URL:');
-              sourceRes.data.liveSource.forEach((url, index) => {
-                console.log(`\n${index + 1}. ${url}`);
-                
-                // 测试处理函数
-                function processSpecialUrls(url) {
-                  if (url.startsWith('kdsvod://')) {
-                    return url.replace('kdsvod://', '');
-                  }
-                  return url;
-                }
-                
-                const processed = processSpecialUrls(url);
-                console.log(`处理后: ${processed}`);
-                console.log(`参数是否完整: ${url.length === processed.length ? '✅' : '❌'}`);
-              });
-            }
-            
-          } catch (error) {
-            console.log('测试失败:', error.message);
-          }
-        }
-        
-        testWithRealData();
-        EOF
-        
-        echo "验证处理函数..."
-        node verify_processing.js
+        echo "开始完整参数诊断（不隐藏任何参数）..."
+        node full_param_diagnose.js
