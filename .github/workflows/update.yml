@@ -1,4 +1,4 @@
-name: 91ktv直播源完整版（最终修正版）
+name: 91ktv直播源完整版
 on:
   workflow_dispatch:
   schedule:
@@ -150,6 +150,8 @@ jobs:
                       let sourceUrl = sources[i];
                       
                       if (isUtuxxUrl(sourceUrl)) {
+                        console.log('检测到utuxx域名，添加完整认证参数');
+                        
                         // 构建认证参数
                         const authParams = new URLSearchParams({
                           app: 'com.jiaoxiang.fangnale',
@@ -163,15 +165,62 @@ jobs:
                         
                         const separator = sourceUrl.includes('?') ? '&' : '?';
                         const fullUrl = sourceUrl + separator + authParams;
+                        console.log('完整URL ' + (i + 1) + ': ' + fullUrl.substring(0, 150) + '...');
+                        
                         m3uContent += fullUrl + '\n';
+                        totalStreams++;
+                        
+                        // 如果是虎牙分类，额外添加一个使用不同ev值的备用URL
+                        if (category === '虎牙') {
+                          const ev2 = '20240918';
+                          const sign2 = generateSignature(channel.ename, nwtime, ev2);
+                          const authParams2 = new URLSearchParams({
+                            app: 'com.jiaoxiang.fangnale',
+                            version: '2.3.4',
+                            mac: 'fu:ck:92:92:ff',
+                            utk: '',
+                            nwtime: nwtime.toString(),
+                            ev: ev2,
+                            sign: sign2
+                          }).toString();
+                          
+                          const fullUrl2 = sourceUrl + separator + authParams2;
+                          console.log('虎牙备用URL ' + (i + 1) + ' (ev=' + ev2 + '): ' + fullUrl2.substring(0, 150) + '...');
+                          m3uContent += fullUrl2 + '\n';
+                          totalStreams++;
+                        }
                       } else {
-                        m3uContent += sourceUrl + '\n';
+                        // 非utuxx域名，检查是否已包含认证参数
+                        if (sourceUrl.includes('app=com.jiaoxiang.fangnale')) {
+                          // 如果已包含认证参数，直接使用
+                          console.log('非utuxx域名但已包含认证参数，直接使用');
+                          m3uContent += sourceUrl + '\n';
+                          totalStreams++;
+                        } else {
+                          // 添加认证参数
+                          const authParams = new URLSearchParams({
+                            app: 'com.jiaoxiang.fangnale',
+                            version: '2.3.4',
+                            mac: 'fu:ck:92:92:ff',
+                            utk: '',
+                            nwtime: nwtime.toString(),
+                            ev: ev,
+                            sign: sign
+                          }).toString();
+                          
+                          const separator = sourceUrl.includes('?') ? '&' : '?';
+                          const fullUrl = sourceUrl + separator + authParams;
+                          console.log('非utuxx域名完整URL ' + (i + 1) + ': ' + fullUrl.substring(0, 150) + '...');
+                          
+                          m3uContent += fullUrl + '\n';
+                          totalStreams++;
+                        }
                       }
-                      totalStreams++;
                     }
                     
                     totalChannels++;
                   } else {
+                    // 如果没有播放源，添加默认源
                     console.log('频道 ' + channel.name + ' 无播放源，使用默认源');
                     m3uContent += '#EXTINF:-1 tvg-id="' + channel.ename + '" tvg-name="' + channel.name + '" tvg-logo="' + channel.icon + '" group-title="' + category + '",' + channel.name + '\n';
                     m3uContent += 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n';
@@ -181,12 +230,14 @@ jobs:
                   
                 } catch (error) {
                   console.log('处理频道 ' + channel.name + ' 失败: ' + error.message);
+                  // 即使失败也保存频道信息
                   m3uContent += '#EXTINF:-1 tvg-id="' + channel.ename + '" tvg-name="' + channel.name + '" group-title="' + category + '",' + channel.name + '\n';
                   m3uContent += 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n';
                   totalChannels++;
                   totalStreams++;
                 }
                 
+                // 添加延迟避免请求过快
                 await new Promise(resolve => setTimeout(resolve, 500));
               }
               
@@ -195,14 +246,17 @@ jobs:
               
             } catch (error) {
               console.log('处理分类 ' + category + ' 失败: ' + error.message);
+              // 即使失败也保存分类信息
               m3uContent += '# 分类: ' + category + '\n';
               m3uContent += '#EXTINF:-1 tvg-id="default_' + category + '" tvg-name="' + category + '" group-title="' + category + '",' + category + '\n';
               m3uContent += 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n\n';
             }
             
+            // 添加延迟避免请求过快
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
           
+          // 添加统计信息
           const duration = Math.round((Date.now() - startTime) / 1000);
           m3uContent += '# 统计信息:\n';
           m3uContent += '# 处理分类数: ' + categories.length + '\n';
@@ -211,14 +265,16 @@ jobs:
           m3uContent += '# 播放源总数: ' + totalStreams + '\n';
           m3uContent += '# 生成耗时: ' + duration + '秒\n';
           m3uContent += '# 更新时间: ' + getBeijingTime() + '\n';
+          m3uContent += '# 版本: 最终修正版 - 不删减任何分类和频道\n';
           
+          // 保存文件
           fs.writeFileSync('91ktv.m3u', m3uContent);
           
           console.log('生成完成!');
-          console.log('分类数: ' + categories.length);
+          console.log('分类数: ' + categories.length + '（完整不删减）');
           console.log('成功分类数: ' + successfulCategories);
-          console.log('频道数: ' + totalChannels);
-          console.log('播放源数: ' + totalStreams);
+          console.log('频道数: ' + totalChannels + '（完整不删减）');
+          console.log('播放源数: ' + totalStreams + '（完整不删减）');
           console.log('耗时: ' + duration + '秒');
         }
         
@@ -237,11 +293,18 @@ jobs:
         echo "=== 文件验证 ==="
         echo "M3U文件生成状态: $(if [ -f 91ktv.m3u ]; then echo '✅ 成功生成'; else echo '❌ 生成失败'; fi)"
         echo "文件大小: $(if [ -f 91ktv.m3u ]; then wc -c < 91ktv.m3u; else echo 0; fi) 字节"
+        echo ""
+        echo "=== 内容验证 ==="
+        if [ -f 91ktv.m3u ]; then
+          echo "播放源数量: $(grep -c '^http' 91ktv.m3u)"
+          echo "频道数量: $(grep -c '^#EXTINF' 91ktv.m3u)"
+          echo "utuxx域名URL数量: $(grep -c 'utuxx.91kds.cn' 91ktv.m3u)"
+        fi
 
     - name: 提交更新
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git add 91ktv.m3u
-        git commit -m "最终修正版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
+        git commit -m "最终修正版直播源更新（不删减任何内容） $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
         git push
