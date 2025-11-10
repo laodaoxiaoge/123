@@ -63,7 +63,9 @@ jobs:
         function isUtuxxUrl(url) {
           return url.includes('utuxx.91kds.cn');
         }
-        
+        // 为URL添加完整认证参数
+        function addFullAuthParams(baseUrl, ename, nwtime, ev = '20240918') {
+          const sign = generateSignature(ename, nwtime, ev);
         // Process kdsvod protocol - remove header
         function processKdsvodUrl(url) {
           if (url.startsWith('kdsvod://')) {
