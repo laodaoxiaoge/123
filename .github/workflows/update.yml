@@ -1,4 +1,4 @@
-name: 91ktv直播源最终版
+name: 91ktv直播源最终修正版
 on:
   workflow_dispatch:
   schedule:
@@ -21,16 +21,16 @@ jobs:
     - name: 安装依赖
       run: npm install axios crypto-js
 
-    - name: 生成最终版直播源
+    - name: 生成最终修正版直播源
       run: |
-        cat > generate_final.js << 'EOF'
+        cat > generate_final_corrected.js << 'EOF'
         const axios = require('axios');
         const CryptoJS = require('crypto-js');
         const fs = require('fs');
         
         // 获取北京时间
         function getBeijingTime() {
-          return new Date().toLocaleString('zh-CN', { 
+          return new Date().极caleString('zh-CN', { 
             timeZone: 'Asia/Shanghai',
             year: 'numeric',
             month: '2-digit',
@@ -43,7 +43,7 @@ jobs:
         
         // 生成签名
         function generateSignature(ename, nwtime, ev = '20250113') {
-          const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff';
+          const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu极.3.4fu:ck:92:92:ff';
           const srcKey = ename + appKey + nwtime + ev;
           return CryptoJS.MD5(srcKey).toString();
         }
@@ -64,31 +64,35 @@ jobs:
           return url.includes('utuxx.91kds.cn');
         }
         
-        // 检查是否为需要过滤的URL（kdsvod://协议）
-        function shouldFilterUrl(url) {
-          return url.startsWith('kdsvod://');
+        // 处理kdsvod://协议 - 去除头部保留实际URL
+        function processKdsvodUrl(url) {
+          if (url.startsWith('kdsvod://')) {
+            // 去除kdsvod://头部，保留后面的实际URL
+            return url.replace('kdsvod://', 'http://');
+          }
+          return url;
         }
         
         async function main() {
-          console.log('开始生成最终版直播源...');
+          console.log('开始生成最终修正版直播源...');
           const startTime = Date.now();
           const currentTime = getBeijingTime();
-          const ev = '20250113'; // 所有分类统一使用ev=20250113
+          const ev = '20250113';
           
           let m3uContent = '#EXTM3U\n';
           m3uContent += '# 91ktv直播源更新时间: ' + currentTime + '\n';
-          m3uContent += '# 版本: 最终版 - 所有分类使用ev=20250113\n\n';
+          m3uContent += '# 版本: 最终修正版 - 去除kdsvod://头部保留实际URL\n\n';
           
           let totalChannels = 0;
           let totalStreams = 0;
           let streamsWithAuth = 0;
           let streamsWithoutAuth = 0;
-          let filteredStreams = 0;
+          let processedKdsvodUrls = 0;
           
           // 完整分类列表
           const categories = [
-            '央视', '卫视', '高清', '4K', '影视', '体育', '新闻', '财经', '综艺', '教育',
-            '纪录', '国际', '网络', '购物', '虎牙', '安徽', '北京', '重庆', '福建',
+            '央视', '卫视', '高清', '4K', '影视', '体育', '新闻极 '财经', '综艺', '教育',
+            '纪录', '国际', '网络', '购物', '极牙', '安徽', '北京', '重庆', '福建',
             '甘肃', '湖北', '湖南', '吉林', '江苏', '江西', '辽宁', '内蒙古', '宁夏', '青海',
             '山东', '山西', '陕西', '上海', '贵州', '海南', '河北', '河南', '黑龙江', '天津',
             '新疆', '西藏', '云南', '浙江', '广西', '广东', '四川'
@@ -118,13 +122,13 @@ jobs:
               }
               
               console.log('分类 ' + category + ' 有 ' + response.data.length + ' 个频道');
-              m3uContent += '# 分类: ' + category + '\n';
+              m3uContent += '# 分类: ' + category极 '\n';
               
               for (const channel of response.data) {
                 try {
                   const nwtime = Math.floor(Date.now() / 1000);
                   const sign = generateSignature(channel.ename, nwtime, ev);
-                  const id = extractId(channel.ename);
+                  const id = extract极(channel.ename);
                   
                   let apiUrl;
                   if (category === '虎牙') {
@@ -150,16 +154,15 @@ jobs:
                     m3uContent += '#EXTINF:-1 tvg-id="' + channel.ename + '" tvg-name="' + channel.name + '" tvg-logo="' + (channel.icon || '') + '" group-title="' + category + '",' + channel.name + '\n';
                     
                     for (const sourceUrl of sources) {
-                      if (shouldFilterUrl(sourceUrl)) {
-                        console.log('过滤kdsvod协议URL: ' + sourceUrl);
-                        filteredStreams++;
-                        continue;
+                      // 处理kdsvod://协议 - 去除头部保留实际URL
+                      let finalUrl = processKdsvodUrl(sourceUrl);
+                      if (sourceUrl !== finalUrl) {
+                        console.log('处理kdsvod协议URL: ' + sourceUrl + ' -> ' + finalUrl);
+                        processedKdsvodUrls++;
                       }
                       
-                      let finalUrl = sourceUrl;
-                      
                       // 对于虎牙分类，确保URL以正确的格式开头
-                      if (category === '虎牙' && !sourceUrl.includes('utuxx.91kds.cn/live1/huya.m3u8')) {
+                      if (category === '虎牙' && !finalUrl.includes('utuxx.91kds.cn/live1/huya.m3u8')) {
                         finalUrl = 'http://utuxx.91kds.cn/live1/huya.m3u8?id=' + id;
                       }
                       
@@ -184,7 +187,7 @@ jobs:
                       } else {
                         m3uContent += finalUrl + '\n';
                         streamsWithAuth++;
-                        console.log('使用原始URL: ' + finalUrl.substring(0, 100));
+                        console.log('使用URL: ' + finalUrl.substring(0, 100));
                       }
                       totalStreams++;
                     }
@@ -213,7 +216,7 @@ jobs:
           m3uContent += '# 播放源总数: ' + totalStreams + '\n';
           m3uContent += '# 已有认证参数: ' + streamsWithAuth + '\n';
           m3uContent += '# 添加认证参数: ' + streamsWithoutAuth + '\n';
-          m3uContent += '# 过滤URL数: ' + filteredStreams + '\n';
+          m3uContent += '# 处理kdsvod协议URL数: ' + processedKdsvodUrls + '\n';
           m3uContent += '# 生成耗时: ' + duration + '秒\n';
           m3uContent += '# 更新时间: ' + currentTime + '\n';
           m3uContent += '# ev参数: ' + ev + '\n';
@@ -222,19 +225,19 @@ jobs:
           
           console.log('生成完成!');
           console.log('分类数: ' + categories.length);
-          console.log('频道数: ' + totalChannels);
+          console.log('频道极: ' + totalChannels);
           console.log('播放源数: ' + totalStreams);
           console.log('已有认证参数: ' + streamsWithAuth);
           console.log('添加认证参数: ' + streamsWithoutAuth);
-          console.log('过滤URL数: ' + filteredStreams);
+          console.log('处理kdsvod协议URL数: ' + processedKdsvodUrls);
           console.log('耗时: ' + duration + '秒');
         }
         
         main().catch(console.error);
         EOF
         
-        echo "开始生成最终版直播源..."
-        node generate_final.js
+        echo "开始生成最终修正版直播源..."
+        node generate_final_corrected.js
 
     - name: 验证结果
       run: |
@@ -243,16 +246,20 @@ jobs:
           echo "文件大小: $(wc -c < 91ktv.m3u) 字节"
           echo "播放源数量: $(grep -c '^http' 91ktv.m3u)"
           echo ""
+          echo "=== kdsvod协议处理验证 ==="
+          echo "kdsvod://协议URL数量: $(grep -c 'kdsvod://' 91ktv.m3u || echo 0)"
+          echo "处理后的URL数量: $(grep -c 'http://' 91ktv.m3u)"
+          echo ""
           echo "=== 认证参数验证 ==="
-          echo "包含认证参数的URL: $(grep -c 'app=com.jiaoxiang.fangnale' 91ktv.m3u)"
-          echo "使用ev=20250113的URL: $(grep -c 'ev=20250113' 91ktv.m3u)"
+          echo "包含认证参数的URL数量: $(grep -c 'app=com.jiaoxiang.fangnale' 91ktv.m3u)"
+          echo "使用ev=20250113的URL数量: $(grep -c 'ev=20250113' 91ktv.m3u)"
           echo ""
           echo "=== 虎牙分类验证 ==="
           echo "虎牙分类频道数: $(grep -c 'group-title=\"虎牙\"' 91ktv.m3u)"
           echo "虎牙分类URL格式: $(grep -A1 'group-title=\"虎牙\"' 91ktv.m3u | grep 'http://utuxx.91kds.cn/live1/huya.m3u8' | head -1 | cut -d'?' -f1)"
           echo ""
           echo "=== 示例URL ==="
-          grep -E 'utuxx.91kds.cn.*id=[0-9]+.*app=com.jiaoxiang.fangnale.*ev=20250113.*sign=[a-f0-9]+' 91ktv.m3u | head -1
+          grep -E 'http://utuxx.91kds.cn/live1/huya.m3u8.*id=[0-9]+.*app=com.jiaoxiang.fangnale.*ev=20250113.*sign=[a-f0-9]+' 91ktv.m3u | head -1
         else
           echo "文件未生成"
         fi
@@ -262,5 +269,5 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git add 91ktv.m3u
-        git commit -m "最终版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
+        git commit -m "最终修正版直播源更新（去除kdsvod://头部） $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
         git push
