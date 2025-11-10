@@ -1,4 +1,4 @@
-name: 91ktv直播源简洁版
+name: 91ktv直播源最终完整版
 on:
   workflow_dispatch:
   schedule:
@@ -21,9 +21,9 @@ jobs:
     - name: 安装依赖
       run: npm install axios crypto-js
 
-    - name: 生成简洁版直播源
+    - name: 生成最终完整版直播源
       run: |
-        cat > generate_clean.js << 'EOF'
+        cat > generate_final_complete.js << 'EOF'
         const axios = require('axios');
         const CryptoJS = require('crypto-js');
         const fs = require('fs');
@@ -43,7 +43,7 @@ jobs:
         
         // 生成签名
         function generateSignature(ename, nwtime, ev = '20250113') {
-          const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyao极aigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff';
+          const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff';
           const srcKey = ename + appKey + nwtime + ev;
           return CryptoJS.MD5(srcKey).toString();
         }
@@ -70,7 +70,7 @@ jobs:
         }
         
         async function main() {
-          console.log('开始生成简洁版直播源...');
+          console.log('开始生成最终完整版直播源...');
           const startTime = Date.now();
           const currentTime = getBeijingTime();
           const ev = '20250113'; // 固定ev值
@@ -86,6 +86,7 @@ jobs:
           let streamsWithAuth = 0;
           let streamsWithoutAuth = 0;
           let filteredStreams = 0;
+          let successfulCategories = 0;
           
           // 完整分类列表
           const categories = [
@@ -93,10 +94,11 @@ jobs:
             '纪录', '国际', '网络', '购物', '虎牙', '安徽', '北京', '重庆', '福建',
             '甘肃', '湖北', '湖南', '吉林', '江苏', '江西', '辽宁', '内蒙古', '宁夏', '青海',
             '山东', '山西', '陕西', '上海', '贵州', '海南', '河北', '河南', '黑龙江', '天津',
-            '新疆', '西藏', '云南', '极江', '广西', '广东', '四川'
+            '新疆', '西藏', '云南', '浙江', '广西', '广东', '四川'
           ];
           
           console.log('开始处理 ' + categories.length + ' 个分类...');
+          console.log('固定ev参数: ' + ev);
           
           for (const category of categories) {
             try {
@@ -109,7 +111,7 @@ jobs:
                   timeout: 20000,
                   headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': '极://www.91kds.cn/'
+                    'Referer': 'http://www.91kds.cn/'
                   }
                 }
               );
@@ -119,9 +121,9 @@ jobs:
                 continue;
               }
               
-              console.log('分类 ' + category极 ' 有 ' + response.data.length + ' 个频道');
+              console.log('分类 ' + category + ' 有 ' + response.data.length + ' 个频道');
+              m3uContent += '# 分类: ' + category + '\n';
               
-              // 处理每个频道
               for (const channel of response.data) {
                 try {
                   const nwtime = Math.floor(Date.now() / 1000);
@@ -156,18 +158,18 @@ jobs:
                       if (shouldFilterUrl(sourceUrl)) {
                         console.log('过滤kdsvod协议URL: ' + sourceUrl);
                         filteredStreams++;
-                        continue; // 跳过这个URL
+                        continue;
                       }
                       
-                      // 对于虎牙分类，确保URL以正确的格式开头
                       let finalUrl = sourceUrl;
+                      
+                      // 对于虎牙分类，确保URL以正确的格式开头
                       if (category === '虎牙' && !sourceUrl.startsWith('http://utuxx.91kds.cn/live1/huya.m3u8?')) {
-                        // 构建正确的虎牙播放源URL
                         finalUrl = 'http://utuxx.91kds.cn/live1/huya.m3u8?id=' + id;
                       }
                       
                       if (needsAuthParams(finalUrl) && !hasAuthParams(finalUrl)) {
-                        // 如果是utuxx.91kds.cn/live1/域名且不包含认证参数，添加完整认证参数
+                        // 添加完整认证参数
                         const authParams = new URLSearchParams({
                           id: id,
                           app: 'com.jiaoxiang.fangnale',
@@ -175,7 +177,7 @@ jobs:
                           mac: 'fu:ck:92:92:ff',
                           utk: '',
                           nwtime: nwtime.toString(),
-                          ev: ev, // 固定ev值
+                          ev: ev,
                           sign: sign
                         }).toString();
                         
@@ -185,7 +187,6 @@ jobs:
                         streamsWithoutAuth++;
                         console.log('添加认证参数: ' + fullUrl.substring(0, 150));
                       } else {
-                        // 直接使用原始URL（非utuxx.91kds.cn/live1/域名或已包含认证参数）
                         m3uContent += finalUrl + '\n';
                         streamsWithAuth++;
                         console.log('使用原始URL: ' + finalUrl.substring(0, 100));
@@ -203,16 +204,18 @@ jobs:
               }
               
               m3uContent += '\n';
+              successfulCategories++;
               await new Promise(resolve => setTimeout(resolve, 1000));
             } catch (error) {
               console.log('跳过分类: ' + category);
             }
           }
           
-          // 在文件末尾添加简洁的统计信息
+          // 添加简洁统计信息
           const duration = Math.round((Date.now() - startTime) / 1000);
           m3uContent += '# 统计: 分类=' + categories.length + ', 频道=' + totalChannels + ', 源=' + totalStreams + ', 耗时=' + duration + '秒\n';
           m3uContent += '# 更新时间: ' + currentTime + '\n';
+          m3uContent += '# ev参数: ' + ev + '\n';
           
           fs.writeFileSync('91ktv.m3u', m3uContent);
           
@@ -230,25 +233,34 @@ jobs:
         main().catch(console.error);
         EOF
         
-        echo "开始生成简洁版直播源..."
-        node generate_clean.js
+        echo "开始生成最终完整版直播源..."
+        node generate_final_complete.js
 
-    - name: 验证简洁输出
+    - name: 语法检查
       run: |
-        echo "=== 简洁输出验证 ==="
+        echo "=== 语法检查 ==="
+        node -c generate_final_complete.js && echo "✅ 语法检查通过" || echo "❌ 语法检查失败"
+
+    - name: 验证结果
+      run: |
+        echo "=== 结果验证 ==="
         if [ -f 91ktv.m3u ]; then
           echo "文件大小: $(wc -c < 91ktv.m3u) 字节"
-          echo "文件行数: $(wc -l < 91ktv.m3u)"
+          echo "播放源数量: $(grep -c '^http' 91ktv.m3u)"
           echo ""
-          echo "=== 头部内容 ==="
-          head -5 91ktv.m3u
-          echo ""
-          echo "=== 尾部内容 ==="
-          tail -3 91ktv.m3u
+          echo "=== 头部更新时间频道验证 ==="
+          head -3 91ktv.m3u
           echo ""
           echo "=== 虎牙分类验证 ==="
           echo "虎牙分类频道数: $(grep -c 'group-title=\"虎牙\"' 91ktv.m3u)"
           echo "虎牙分类URL格式: $(grep -A1 'group-title=\"虎牙\"' 91ktv.m3u | grep 'http://utuxx.91kds.cn/live1/huya.m3u8?' | head -1 | cut -d'?' -f1)"
+          echo ""
+          echo "=== 认证参数验证 ==="
+          echo "包含认证参数的URL数: $(grep -c 'app=com.jiaoxiang.fangnale' 91ktv.m3u)"
+          echo "包含ev参数的URL数: $(grep -c 'ev=20250113' 91ktv.m3u)"
+          echo ""
+          echo "=== kdsvod协议过滤验证 ==="
+          echo "kdsvod协议URL数: $(grep -c 'kdsvod://' 91ktv.m3u || echo 0)"
         else
           echo "文件未生成"
         fi
@@ -258,5 +270,5 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git add 91ktv.m3u
-        git commit -m "简洁版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
+        git commit -m "最终完整版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
         git push
