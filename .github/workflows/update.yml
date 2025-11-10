@@ -67,7 +67,7 @@ jobs:
         // Process kdsvod protocol - remove header
         function processKdsvodUrl(url) {
           if (url.startsWith('kdsvod://')) {
-            return url.replace('kdsvod://', 'http://');
+            return url.replace('kdsvod://', '');
           }
           return url;
         }
