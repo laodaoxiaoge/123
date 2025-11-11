@@ -172,7 +172,7 @@ jobs:
                       
                       // 处理kdsvod://协议
                       if (finalUrl.startsWith('kdsvod://')) {
-                        finalUrl = finalUrl.replace('kdsvod://', 'http://');
+                        finalUrl = finalUrl.replace('kdsvod://', '');
                       }
                       
                       // 特别处理虎牙分类
