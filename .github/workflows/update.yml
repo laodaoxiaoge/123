@@ -57,7 +57,7 @@ jobs:
         // 处理URL - 去除kdsvod://头部，去除线路括号内容
         function processUrl(url) {
           // 去除kdsvod://头部
-          let processedUrl = url.replace(/^kdsvod:\/\//, 'http://');
+          let processedUrl = url.replace(/^kdsvod:\/\//, '');
           
           // 去除线路名称中的括号内容
           processedUrl = processedUrl.replace(/线路\d+\(\S+\)/, '');
