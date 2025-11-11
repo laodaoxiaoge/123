@@ -1,0 +1,281 @@
+name: 91KTV直播源生成
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 19 * * *'  # 每天UTC时间19点运行（北京时间3点）
+
+jobs:
+  generate-m3u:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    
+    steps:
+    - name: 检出仓库
+      uses: actions/checkout@v4
+      
+    - name: 设置Node.js环境
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: 安装依赖
+      run: npm install axios crypto-js
+
+    - name: 生成M3U文件
+      run: |
+        cat > generate_91ktv.js << 'EOF'
+        const axios = require('axios');
+        const CryptoJS = require('crypto-js');
+        const fs = require('fs');
+        
+        // 获取北京时间
+        function getBeijingTime() {
+          return new Date().toLocaleString('zh-CN', {
+            timeZone: 'Asia/Shanghai',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          });
+        }
+        
+        // 生成签名
+        function generateSignature(ename, nwtime, ev = '20240918') {
+          const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff';
+          const srcKey = ename + appKey + nwtime + ev;
+          return CryptoJS.MD5(srcKey).toString();
+        }
+        
+        // 从ename中提取ID
+        function extractId(ename) {
+          const match = ename.match(/\d+/);
+          return match ? match[0] : '11342412';
+        }
+        
+        // 处理URL - 去除kdsvod://头部，去除线路括号内容
+        function processUrl(url) {
+          // 去除kdsvod://头部
+          let processedUrl = url.replace(/^kdsvod:\/\//, '');
+          
+          // 去除线路名称中的括号内容
+          processedUrl = processedUrl.replace(/线路\d+\(\S+\)/, '');
+          
+          return processedUrl;
+        }
+        
+        // 为URL添加认证参数
+        function addAuthParams(baseUrl, ename, nwtime, ev = '20240918') {
+          const sign = generateSignature(ename, nwtime, ev);
+          const id = extractId(ename);
+          
+          const separator = baseUrl.includes('?') ? '&' : '?';
+          
+          const authParams = new URLSearchParams({
+            id: id,
+            app: 'com.jiaoxiang.fangnale',
+            version: '2.3.4',
+            mac: 'fu:ck:92:92:ff',
+            utk: '',
+            nwtime: nwtime.toString(),
+            ev: ev,
+            sign: sign
+          }).toString();
+          
+          return `${baseUrl}${separator}${authParams}`;
+        }
+        
+        async function main() {
+          console.log('开始生成91KTV直播源M3U文件...');
+          const startTime = Date.now();
+          const currentTime = getBeijingTime();
+          const ev = '20250113';
+          
+          let m3uContent = '#EXTM3U\n';
+          m3uContent += '# 91KTV直播源更新时间: ' + currentTime + '\n';
+          m3uContent += '# 版本: 转换版 - 基于JavaScript规则转换\n\n';
+          
+          // 在顶部添加更新信息频道（使用有效线路）
+          m3uContent += '#EXTINF:-1 tvg-id="UPDATE_INFO" tvg-name="更新时间: ' + currentTime + '" tvg-logo="https://example.com/update.png" group-title="信息",更新时间: ' + currentTime + '\n';
+          m3uContent += 'https://cctvalih5ca.v.myalicdn.com/live/cctv1_2/index.m3u8\n\n';
+          
+          let totalCategories = 0;
+          let totalChannels = 0;
+          let totalStreams = 0;
+          let processedUrls = 0;
+          
+          // 分类列表
+          const categories = [
+            '央视', '卫视', '高清', '4K', '影视', '体育', '动漫', '财经', '综艺', '教育',
+            '新闻', '纪录', '国际', '网络', '购物', '虎牙', '安徽', '北京', '重庆', '福建',
+            '甘肃', '湖北', '湖南', '吉林', '江苏', '江西', '辽宁', '内蒙古', '宁夏', '青海',
+            '山东', '山西', '陕西', '上海', '贵州', '海南', '河北', '河南', '黑龙江', '天津',
+            '新疆', '西藏', '云南', '浙江', '广西', '广东', '四川'
+          ];
+          
+          console.log('开始处理 ' + categories.length + ' 个分类...');
+          
+          for (const category of categories) {
+            try {
+              console.log('处理分类: ' + category);
+              totalCategories++;
+              
+              // 获取频道列表
+              const response = await axios.get(
+                'http://sj.91kds.cn/api/get_channel.php?id=' + encodeURIComponent(category),
+                {
+                  timeout: 20000,
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Referer': 'http://www.91kds.cn/'
+                  }
+                }
+              );
+              
+              if (!response.data || !Array.isArray(response.data)) {
+                console.log('分类 ' + category + ' 无数据，跳过');
+                continue;
+              }
+              
+              console.log('分类 ' + category + ' 有 ' + response.data.length + ' 个频道');
+              m3uContent += '# 分类: ' + category + '\n';
+              
+              for (const channel of response.data) {
+                try {
+                  const nwtime = Math.floor(Date.now() / 1000);
+                  let apiUrl;
+                  
+                  // 特别处理虎牙分类
+                  if (category === '虎牙') {
+                    apiUrl = 'http://api.91kds.cn/zone/srclist?ename=' + channel.ename;
+                  } else {
+                    apiUrl = 'http://sjapi1.91kds.cn/api/get_source.php?ename=' + channel.ename;
+                  }
+                  
+                  console.log('处理频道: ' + channel.name);
+                  
+                  // 获取播放源
+                  const sourceRes = await axios.get(apiUrl, {
+                    timeout: 20000,
+                    headers: {
+                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                      'Referer': 'http://www.91kds.cn/'
+                    }
+                  });
+                  
+                  if (sourceRes.data && sourceRes.data.liveSource && Array.isArray(sourceRes.data.liveSource)) {
+                    const sources = sourceRes.data.liveSource;
+                    const sourceNames = sourceRes.data.liveSourceName || [];
+                    
+                    console.log('频道 ' + channel.name + ' 有 ' + sources.length + ' 个播放源');
+                    
+                    // 添加频道信息
+                    m3uContent += '#EXTINF:-1 tvg-id="' + channel.ename + '" tvg-name="' + channel.name + '" tvg-logo="' + (channel.icon || '') + '" group-title="' + category + '",' + channel.name + '\n';
+                    
+                    for (let i = 0; i < sources.length; i++) {
+                      let sourceUrl = sources[i];
+                      let sourceName = sourceNames[i] || '线路' + (i + 1);
+                      
+                      // 处理URL - 去除kdsvod://头部，去除线路括号内容
+                      let finalUrl = processUrl(sourceUrl);
+                      if (sourceUrl !== finalUrl) {
+                        console.log('处理URL: ' + sourceUrl + ' -> ' + finalUrl);
+                        processedUrls++;
+                      }
+                      
+                      // 为虎牙分类确保正确的URL格式
+                      if (category === '虎牙' && !finalUrl.includes('utuxx.91kds.cn/live1/huya.m3u8')) {
+                        finalUrl = 'http://utuxx.91kds.cn/live1/huya.m3u8';
+                      }
+                      
+                      // 为所有utuxx域名URL添加认证参数
+                      if (finalUrl.includes('utuxx.91kds.cn')) {
+                        finalUrl = addAuthParams(finalUrl, channel.ename, nwtime, ev);
+                      }
+                      
+                      m3uContent += finalUrl + '\n';
+                      totalStreams++;
+                    }
+                    
+                    totalChannels++;
+                  }
+                  
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                } catch (error) {
+                  console.log('跳过频道: ' + channel.name);
+                }
+              }
+              
+              m3uContent += '\n';
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } catch (error) {
+              console.log('跳过分类: ' + category);
+            }
+          }
+          
+          // 添加统计信息
+          const duration = Math.round((Date.now() - startTime) / 1000);
+          m3uContent += '# 统计信息:\n';
+          m3uContent += '# 分类总数: ' + categories.length + '\n';
+          m3uContent += '# 成功处理分类: ' + totalCategories + '\n';
+          m3uContent += '# 频道总数: ' + totalChannels + '\n';
+          m3uContent += '# 播放源总数: ' + totalStreams + '\n';
+          m3uContent += '# 处理URL数: ' + processedUrls + '\n';
+          m3uContent += '# 生成耗时: ' + duration + '秒\n';
+          m3uContent += '# 更新时间: ' + currentTime + '\n';
+          m3uContent += '# EV参数: ' + ev + '\n';
+          
+          fs.writeFileSync('91ktv.m3u', m3uContent);
+          
+          console.log('生成完成!');
+          console.log('分类总数: ' + categories.length);
+          console.log('成功处理分类: ' + totalCategories);
+          console.log('频道总数: ' + totalChannels);
+          console.log('播放源总数: ' + totalStreams);
+          console.log('处理URL数: ' + processedUrls);
+          console.log('耗时: ' + duration + '秒');
+        }
+        
+        main().catch(console.error);
+        EOF
+        
+        echo "开始生成91KTV直播源M3U文件..."
+        node generate_91ktv.js
+
+    - name: 验证结果
+      run: |
+        echo "=== 生成结果验证 ==="
+        if [ -f 91ktv.m3u ]; then
+          echo "文件大小: $(wc -c < 91ktv.m3u) 字节"
+          echo "播放源数量: $(grep -c '^http' 91ktv.m3u)"
+          echo "频道数量: $(grep -c '^#EXTINF' 91ktv.m3u)"
+          echo ""
+          echo "=== 顶部更新信息验证 ==="
+          head -5 91ktv.m3u
+          echo ""
+          echo "=== URL处理验证 ==="
+          echo "kdsvod协议URL数量: $(grep -c 'kdsvod://' 91ktv.m3u || echo 0)"
+          echo "处理后的HTTP URL数量: $(grep -c '^http' 91ktv.m3u)"
+          echo ""
+          echo "=== 虎牙分类验证 ==="
+          echo "虎牙分类频道数: $(grep -c 'group-title=\"虎牙\"' 91ktv.m3u)"
+          echo "虎牙分类URL格式: $(grep -A1 'group-title=\"虎牙\"' 91ktv.m3u | grep 'http://utuxx.91kds.cn/live1/huya.m3u8' | head -1 | cut -d'?' -f1)"
+          echo ""
+          echo "=== 认证参数验证 ==="
+          echo "包含认证参数的URL数量: $(grep -c 'app=com.jiaoxiang.fangnale' 91ktv.m3u)"
+          echo "使用ev=20250113的URL数量: $(grep -c 'ev=20250113' 91ktv.m3u)"
+          echo ""
+          echo "=== 示例URL ==="
+          grep -E 'http://utuxx.91kds.cn/live1/huya.m3u8.*id=[0-9]+.*app=com.jiaoxiang.fangnale.*ev=20250113.*sign=[a-f0-9]+' 91ktv.m3u | head -1
+        else
+          echo "文件未生成"
+        fi
+
+    - name: 提交更新
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git add 91ktv.m3u
+        git commit -m "91KTV直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
+        git push
