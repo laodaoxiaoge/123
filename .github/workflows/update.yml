@@ -1,4 +1,4 @@
-name: 91KTV完整视频流版
+name: 91KTV直播源生成
 on:
   workflow_dispatch:
   schedule:
@@ -21,9 +21,9 @@ jobs:
     - name: 安装依赖
       run: npm install axios crypto-js
 
-    - name: 生成完整视频流版
+    - name: 生成直播源
       run: |
-        cat > generate_complete_streams.js << 'EOF'
+        cat > generate_streams.js << 'EOF'
         const axios = require('axios');
         const CryptoJS = require('crypto-js');
         const fs = require('fs');
@@ -43,7 +43,7 @@ jobs:
         
         // 生成签名
         function generateSignature(ename, nwtime, ev = '20250113') {
-          const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhf极kfbuyaozaigaolefuquqikangbuzhu2.3.极fu:ck:92:92:ff';
+          const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff';
           const srcKey = ename + appKey + nwtime + ev;
           return CryptoJS.MD5(srcKey).toString();
         }
@@ -71,7 +71,7 @@ jobs:
           
           const authParams = new URLSearchParams({
             id: id,
-            app: '极m.jiaoxiang.fangnale',
+            app: 'com.jiaoxiang.fangnale',
             version: '2.3.4',
             mac: 'fu:ck:92:92:ff',
             utk: '',
@@ -84,14 +84,13 @@ jobs:
         }
         
         async function main() {
-          console.log('开始生成完整视频流版直播源...');
+          console.log('开始生成直播源...');
           const startTime = Date.now();
           const currentTime = getBeijingTime();
           const ev = '20250113';
           
           let m3uContent = '#EXTM3U\n';
-          m3uContent += '# 91KTV完整视频流版更新时间: ' + currentTime + '\n';
-          m3uContent += '# 版本: 完整视频流版 - 包含所有API获取的视频流\n\n';
+          m3uContent += '# 91KTV直播源更新时间: ' + currentTime + '\n\n';
           
           // 添加更新时间频道
           m3uContent += '#EXTINF:-1 tvg-id="UPDATE_TIME" tvg-name="更新时间: ' + currentTime + '" tvg-logo="https://example.com/update.png" group-title="信息",更新时间: ' + currentTime + '\n';
@@ -100,9 +99,8 @@ jobs:
           let totalCategories = 0;
           let totalChannels = 0;
           let totalStreams = 0;
-          let processedUrls = 0;
           
-          // 完整分类列表
+          // 分类列表 - 使用英文逗号分隔
           const categories = [
             '央视', '卫视', '高清', '4K', '影视', '体育', '动漫', '财经', '综艺', '教育',
             '新闻', '纪录', '国际', '网络', '购物', '虎牙', '安徽', '北京', '重庆', '福建',
@@ -111,7 +109,7 @@ jobs:
             '新疆', '西藏', '云南', '浙江', '广西', '广东', '四川'
           ];
           
-          console.log('开始处理 ' + categories.length + ' 个分类的所有视频流...');
+          console.log('开始处理 ' + categories.length + ' 个分类...');
           
           for (const category of categories) {
             try {
@@ -131,7 +129,7 @@ jobs:
               );
               
               if (!response.data || !Array.isArray(response.data)) {
-                console.log('分类 ' + category极 ' 无数据,跳过');
+                console.log('分类 ' + category + ' 无数据，跳过');
                 continue;
               }
               
@@ -142,7 +140,7 @@ jobs:
                 try {
                   const nwtime = Math.floor(Date.now() / 1000);
                   
-                  console.log('获取频道所有视频流: ' + channel.name);
+                  console.log('处理频道: ' + channel.name);
                   
                   // 获取播放源
                   let apiUrl;
@@ -163,22 +161,22 @@ jobs:
                   if (sourceRes.data && sourceRes.data.liveSource && Array.isArray(sourceRes.data.liveSource)) {
                     const sources = sourceRes.data.liveSource;
                     
-                    console.log('频道 ' + channel.name + ' 有 ' + sources.length + ' 个视频流');
+                    console.log('频道 ' + channel.name + ' 有 ' + sources.length + ' 个播放源');
                     
                     // 添加频道信息
                     m3uContent += '#EXTINF:-1 tvg-id="' + channel.ename + '" tvg-name="' + channel.name + '" tvg-logo="' + (channel.icon || '') + '" group-title="' + category + '",' + channel.name + '\n';
                     
-                    // 处理所有视频流
+                    // 处理所有播放源
                     for (const sourceUrl of sources) {
+                      let finalUrl = sourceUrl;
+                      
                       // 处理kdsvod://协议
-                      let finalUrl = processKdsvodUrl(sourceUrl);
-                      if (sourceUrl !== finalUrl) {
-                        console.log('处理kdsvod协议URL: ' + sourceUrl + ' -> ' + finalUrl);
-                        processedUrls++;
+                      if (finalUrl.startsWith('kdsvod://')) {
+                        finalUrl = finalUrl.replace('kdsvod://', 'http://');
                       }
                       
                       // 特别处理虎牙分类
-                      if (category === '虎牙' && !finalUrl.includes('utuxx.91kds.cn/live1/h极a.m3u8')) {
+                      if (category === '虎牙' && !finalUrl.includes('utuxx.91kds.cn/live1/huya.m3u8')) {
                         finalUrl = 'http://utuxx.91kds.cn/live1/huya.m3u8';
                       }
                       
@@ -187,7 +185,6 @@ jobs:
                         finalUrl = addAuthParams(finalUrl, channel.ename, nwtime, ev);
                       }
                       
-                      // 添加视频流URL
                       m3uContent += finalUrl + '\n';
                       totalStreams++;
                     }
@@ -212,74 +209,49 @@ jobs:
           const duration = Math.round((Date.now() - startTime) / 1000);
           m3uContent += '# 统计信息:\n';
           m3uContent += '# 分类总数: ' + categories.length + '\n';
-          m3uContent += '# 成功处理分类: ' + totalCategories + '\n';
           m3uContent += '# 频道总数: ' + totalChannels + '\n';
-          m3uContent += '# 视频流总数: ' + totalStreams + '\n';
-          m3uContent += '# 处理URL数: ' + processedUrls + '\n';
+          m3uContent += '# 播放源总数: ' + totalStreams + '\n';
           m3uContent += '# 生成耗时: ' + duration + '秒\n';
           m3uContent += '# 更新时间: ' + currentTime + '\n';
-          m3uContent += '# EV参数: ' + ev + '\n';
-          m3uContent += '# 说明: 完整视频流版 - 包含所有API获取的视频流\n';
           
-          fs.writeFileSync('91ktv_complete_streams.m3u', m3uContent);
+          fs.writeFileSync('91ktv.m3u', m3uContent);
           
-          console.log('完整视频流版生成完成!');
+          console.log('生成完成!');
           console.log('分类总数: ' + categories.length);
-          console.log('成功处理分类: ' + totalCategories);
           console.log('频道总数: ' + totalChannels);
-          console.log('视频流总数: ' + totalStreams);
-          console.log('处理URL数: ' + processedUrls);
+          console.log('播放源总数: ' + totalStreams);
           console.log('耗时: ' + duration + '秒');
         }
         
         main().catch(console.error);
         EOF
         
-        echo "开始生成完整视频流版直播源..."
-        node generate_complete_streams.js
+        echo "开始生成直播源..."
+        node generate_streams.js
 
-    - name: 验证视频流完整性
+    - name: 验证结果
       run: |
-        echo "=== 视频流完整性验证 ==="
-        if [ -f 91ktv_complete_streams.m3u ]; then
-          echo "文件大小: $(wc -c < 91ktv_complete_streams.m3u) 字节"
-          echo "视频流总数: $(grep -c '^http' 91ktv_complete_streams.m3u)"
-          echo "频道总数: $(grep -c '^#EXTINF' 91ktv_complete_streams.m3u)"
+        echo "=== 结果验证 ==="
+        if [ -f 91ktv.m3u ]; then
+          echo "文件大小: $(wc -c < 91ktv.m3u) 字节"
+          echo "播放源数量: $(grep -c '^http' 91ktv.m3u)"
+          echo "频道数量: $(grep -c '^#EXTINF' 91ktv.m3u)"
           echo ""
-          echo "=== 视频流分布验证 ==="
-          echo "平均每个频道的视频流数量: $(echo "scale=2; $(grep -c '^http' 91ktv_complete_streams.m3u) / $(grep -c '^#EXTINF' 91ktv_complete_streams.m3u)" | bc)"
+          echo "=== 分类验证 ==="
+          echo "分类数量: $(grep -c '^# 分类:' 91ktv.m3u)"
+          echo "虎牙分类: $(grep -c 'group-title=\"虎牙\"' 91ktv.m3u)"
           echo ""
-          echo "=== 多视频流频道示例 ==="
-          echo "查找有多个视频流的频道:"
-          # 查找有多个视频流的频道
-          awk '/^#EXTINF/{if (count > 1) print prev_line " - " count "个视频流"; count=0; prev_line=$0} /^http/{count++} END{if (count > 1) print prev_line " - " count "个视频流"}' 91ktv_complete_streams.m3u | head -5
-          echo ""
-          echo "=== 视频流类型验证 ==="
-          echo "HTTP URL数量: $(grep -c '^http://' 91ktv_complete_streams.m3u)"
-          echo "HTTPS URL数量: $(grep -c '^https://' 91ktv_complete_streams.m3u)"
-          echo "包含认证参数的URL: $(grep -c 'app=com.jiaoxiang.fangnale' 91ktv_complete_streams.m3u)"
-          echo ""
-          echo "=== 虎牙分类验证 ==="
-          echo "虎牙分类视频流: $(grep -A1 'group-title=\"虎牙\"' 91ktv_complete_streams.m3u | grep -c 'http://utuxx.91kds.cn/live1/huya.m3u8')"
-          echo ""
-          echo "=== 示例视频流 ==="
-          echo "前10个视频流:"
-          grep '^http' 91ktv_complete_streams.m3u | head -10
-          echo ""
-          echo "=== 文件结构验证 ==="
-          echo "前15行内容:"
-          head -15 91ktv_complete_streams.m3u
-          echo "..."
-          echo "后10行内容:"
-          tail -10 91ktv_complete_streams.m3u
+          echo "=== 认证参数验证 ==="
+          echo "包含认证参数的URL: $(grep -c 'app=com.jiaoxiang.fangnale' 91ktv.m3u)"
+          echo "使用ev=20250113的URL: $(grep -c 'ev=20250113' 91ktv.m3u)"
         else
           echo "文件未生成"
         fi
 
-    - name: 提交完整视频流版
+    - name: 提交更新
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
-        git add 91ktv_complete_streams.m3u
-        git commit -m "91KTV完整视频流版更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
+        git add 91ktv.m3u
+        git commit -m "直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
         git push
