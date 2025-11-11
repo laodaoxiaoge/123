@@ -131,7 +131,7 @@ jobs:
               );
               
               if (!response.data || !Array.isArray(response.data)) {
-                console.log('分类 ' + category极 ' 无数据，跳过');
+                console.log('分类 ' + category极 ' 无数据,跳过');
                 continue;
               }
               
