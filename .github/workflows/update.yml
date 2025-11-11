@@ -201,7 +201,7 @@ jobs:
                         
                         // 处理kdsvod://协议
                         if (finalUrl.startsWith('kdsvod://')) {
-                          finalUrl = finalUrl.replace('kdsvod://', 'http://');
+                          finalUrl = finalUrl.replace('kdsvod://', '');
                         }
                         
                         // 为URL添加认证参数
