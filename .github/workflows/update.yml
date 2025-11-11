@@ -141,11 +141,11 @@ jobs:
                   if (category === '虎牙') {
                     ev = '20250113';
                     sign = generateSignature(channel.ename, nwtime, ev);
-                    apiUrl = `http://sj.91kds.cn/api/get_channel.php?id=${encodeURIComponent(category)`;
+                    apiUrl = `http://api.91kds.cn/zone/srclist?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20250113`;
                   } else {
                     ev = '20240918';
                     sign = generateSignature(channel.ename, nwtime, ev);
-                    apiUrl = `http://sj.91kds.cn/api/get_channel.php?id=${encodeURIComponent(category)`;
+                    apiUrl = `http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20240918`;
                   }
                   
                   console.log(`处理频道 ${channel.name} 签名: ${sign.substring(0, 8)}...`);
