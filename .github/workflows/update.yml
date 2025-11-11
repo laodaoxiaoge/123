@@ -119,7 +119,7 @@ jobs:
           const categories = [
             '央视', '卫视', '高清', '4K', '影视', '体育', '新闻', '财经', '综艺', '教育',
             '纪录', '国际', '网络', '购物', '虎牙', '安徽', '北京', '重庆', '福建',
-            '甘肃', '湖北', '湖南', '吉林', '江苏', '江西', '极宁', '内蒙古', '宁夏', '青海',
+            '甘肃', '湖北', '湖南', '吉林', '江苏', '江西', '辽宁', '内蒙古', '宁夏', '青海',
             '山东', '山西', '陕西', '上海', '贵州', '海南', '河北', '河南', '黑龙江', '天津',
             '新疆', '西藏', '云南', '浙江', '广西', '广东', '四川'
           ];
@@ -222,7 +222,7 @@ jobs:
                     if (category === '虎牙') {
                       // 虎牙分类使用专用URL格式
                       const huyaUrl = processHuyaUrl(channel.ename, nwtime, '20250113');
-                      m3极Content += `${huyaUrl}\n`;
+                      m3uContent += `${huyaUrl}\n`;
                     } else {
                       m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n`;
                     }
