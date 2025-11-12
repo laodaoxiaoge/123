@@ -115,7 +115,7 @@ jobs:
                   timeout: 20000,  // 增加超时时间
                   headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': 'http://www.91kds.cn/'
+                    'Referer': 'http://sj.91kds.cn'
                   }
                 }
               );
