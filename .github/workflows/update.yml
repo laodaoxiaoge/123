@@ -110,7 +110,7 @@ jobs:
               
               // 获取频道列表
               const response = await axios.get(
-                `http://sj.91kds.cn/api/get_source.php?id=${encodeURIComponent(category)}`,
+                `http://sj.91kds.cn/api/get_channel.php?id=${encodeURIComponent(category)}`,
                 { 
                   timeout: 20000,  // 增加超时时间
                   headers: {
