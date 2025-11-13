@@ -21,7 +21,7 @@ jobs:
     - name: 安装依赖
       run: npm install axios crypto-js
 
-    - name: 生成完整版直播源（多API源巡查）
+    - name: 生成完整版直播源（不删减任何内容）
       run: |
         cat > generate_full.js << 'EOF'
         const axios = require('axios');
@@ -48,140 +48,11 @@ jobs:
           return CryptoJS.MD5(srcKey).toString();
         }
         
-        // 从ename中提取ID
-        function extractId(ename) {
-          const match = ename.match(/\d+/);
-          return match ? match[0] : '11342412';
-        }
-        
-        // 多API源获取频道列表
-        async function getChannelListWithMultipleAPIs(category) {
-          const apiSources = [
-            {
-              url: `http://sj.91kds.cn/api/get_channel.php?id=${encodeURIComponent(category)}`,
-              name: '主API'
-            },
-            {
-              url: `http://sjapi1.91kds.cn/api/get_channel.php?id=${encodeURIComponent(category)}`,
-              name: '备用API1'
-            },
-            {
-              url: `http://sjapi2.91kds.cn/api/get_channel.php?id=${encodeURIComponent(category)}`,
-              name: '备用API2'
-            },
-            {
-              url: `http://api.91kds.cn/zone/channellist?id=${encodeURIComponent(category)}`,
-              name: '虎牙API'
-            },
-            {
-              url: `http://cdn.91kds.cn/api/channel_list.php?category=${encodeURIComponent(category)}`,
-              name: 'CDN API'
-            }
-          ];
-          
-          const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'http://www.91kds.cn/'
-          };
-          
-          // 尝试每个API源直到成功
-          for (const api of apiSources) {
-            try {
-              console.log(`尝试 ${api.name} 获取分类 ${category}: ${api.url}`);
-              
-              const response = await axios.get(api.url, {
-                timeout: 15000,
-                headers: headers
-              });
-              
-              if (response.data && Array.isArray(response.data)) {
-                console.log(`成功从 ${api.name} 获取分类 ${category}: ${response.data.length} 个频道`);
-                return {
-                  data: response.data,
-                  source: api.name
-                };
-              }
-            } catch (error) {
-              console.log(`${api.name} 获取分类 ${category} 失败: ${error.message}`);
-              // 继续尝试下一个API源
-            }
-          }
-          
-          // 如果所有API都失败，返回空数组
-          console.log(`所有API源获取分类 ${category} 失败`);
-          return {
-            data: [],
-            source: 'none'
-          };
-        }
-        
-        // 多API源获取播放源
-        async function getSourceListWithMultipleAPIs(ename, category) {
-          const apiSources = [
-            {
-              url: category === '虎牙' ? 
-                   `http://api.91kds.cn/zone/srclist?ename=${ename}` :
-                   `http://sjapi1.91kds.cn/api/get_source.php?ename=${ename}`,
-              name: '主源API'
-            },
-            {
-              url: category === '虎牙' ?
-                   `http://api2.91kds.cn/zone/srclist?ename=${ename}` :
-                   `http://sjapi2.91kds.cn/api/get_source.php?ename=${ename}`,
-              name: '备用源API1'
-            },
-            {
-              url: `http://cdn.91kds.cn/api/source_list.php?ename=${ename}&category=${encodeURIComponent(category)}`,
-              name: 'CDN源API'
-            },
-            {
-              url: `http://utuxx.91kds.cn/live1/source.php?ename=${ename}`,
-              name: 'utuxx源API'
-            }
-          ];
-          
-          const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'http://www.91kds.cn/'
-          };
-          
-          // 尝试每个API源直到成功
-          for (const api of apiSources) {
-            try {
-              console.log(`尝试 ${api.name} 获取频道 ${ename} 播放源: ${api.url}`);
-              
-              const response = await axios.get(api.url, {
-                timeout: 15000,
-                headers: headers
-              });
-              
-              if (response.data && response.data.liveSource && Array.isArray(response.data.liveSource)) {
-                console.log(`成功从 ${api.name} 获取频道 ${ename} 播放源: ${response.data.liveSource.length} 个源`);
-                return {
-                  data: response.data,
-                  source: api.name
-                };
-              }
-            } catch (error) {
-              console.log(`${api.name} 获取频道 ${ename} 播放源失败: ${error.message}`);
-              // 继续尝试下一个API源
-            }
-          }
-          
-          // 如果所有API都失败，返回空数据
-          console.log(`所有API源获取频道 ${ename} 播放源失败`);
-          return {
-            data: { liveSource: [] },
-            source: 'none'
-          };
-        }
-        
         // 为URL添加完整认证参数
         function addFullAuthParams(baseUrl, ename, nwtime, ev = '20240918') {
           const sign = generateSignature(ename, nwtime, ev);
-          const id = extractId(ename);
           
-          // 处理kdsvod://协议
+          // 解析基础URL
           let url = baseUrl;
           if (url.startsWith('kdsvod://')) {
             url = url.replace('kdsvod://', '');
@@ -192,7 +63,6 @@ jobs:
           
           // 添加完整认证参数
           const authParams = new URLSearchParams({
-            id: id,
             app: 'com.jiaoxiang.fangnale',
             version: '2.3.4',
             mac: 'fu:ck:92:92:ff',
@@ -205,41 +75,14 @@ jobs:
           return `${url}${separator}${authParams}`;
         }
         
-        // 处理特殊URL类型
-        function processSpecialUrlTypes(url, ename, nwtime, ev, category) {
-          let finalUrl = url;
-          
-          // 处理kdsvod://协议
-          if (finalUrl.startsWith('kdsvod://')) {
-            finalUrl = finalUrl.replace('kdsvod://', '');
-          }
-          
-          // 特别处理虎牙分类 - 确保使用正确的URL格式
-          if (category === '虎牙' && !finalUrl.includes('utuxx.91kds.cn/live1/huya.m3u8')) {
-            finalUrl = 'http://utuxx.91kds.cn/live1/huya.m3u8';
-          }
-          
-          // 处理jsb类型URL - 确保使用正确的URL格式
-          if (finalUrl.includes('jsb') && !finalUrl.includes('utuxx.91kds.cn/live1/jsb.m3u8')) {
-            finalUrl = 'http://utuxx.91kds.cn/live1/jsb.m3u8';
-          }
-          
-          // 为utuxx域名URL添加认证参数
-          if (finalUrl.includes('utuxx.91kds.cn') && !finalUrl.includes('app=')) {
-            finalUrl = addFullAuthParams(finalUrl, ename, nwtime, ev);
-          }
-          
-          return finalUrl;
-        }
-        
         async function main() {
-          console.log('开始生成完整版直播源（多API源巡查）...');
+          console.log('开始生成完整版直播源（不删减任何分类和频道）...');
           const startTime = Date.now();
           const currentTime = getBeijingTime();
           
           let m3uContent = '#EXTM3U\n';
           m3uContent += `# 91ktv直播源更新时间: ${currentTime}\n`;
-          m3uContent += `# 版本: 完整版 - 多API源巡查 - 不删减任何内容\n\n`;
+          m3uContent += `# 版本: 完整版 - 不删减任何分类和频道\n\n`;
           
           // 添加更新时间频道
           m3uContent += `#EXTINF:-1 tvg-id="UPDATE_TIME" tvg-name="更新时间: ${currentTime}" group-title="信息",更新时间: ${currentTime}\n`;
@@ -248,9 +91,8 @@ jobs:
           let totalChannels = 0;
           let totalStreams = 0;
           let successfulCategories = 0;
-          let apiUsageStats = {};
           
-          // 完整分类列表
+          // 完整分类列表（不删减任何分类）
           const categories = [
             '央视', '卫视', '高清', '4K', '影视', '体育', '新闻', '财经', '综艺', '教育',
             '纪录', '国际', '网络', '购物', '虎牙', '安徽', '北京', '重庆', '福建',
@@ -259,90 +101,98 @@ jobs:
             '新疆', '西藏', '云南', '浙江', '广西', '广东', '四川'
           ];
           
-          console.log(`开始处理 ${categories.length} 个分类（多API源巡查）...`);
+          console.log(`开始处理 ${categories.length} 个完整分类（不删减任何分类）...`);
           
-          // 处理每个分类
+          // 处理每个分类（不跳过任何分类）
           for (const category of categories) {
             try {
-              console.log(`\n=== 处理分类: ${category} ===`);
+              console.log(`处理分类: ${category}`);
               
-              // 使用多API源获取频道列表
-              const channelResult = await getChannelListWithMultipleAPIs(category);
-              const channels = channelResult.data;
-              const apiSource = channelResult.source;
+              // 获取频道列表
+              const response = await axios.get(
+                `http://sj.91kds.cn/api/get_source.php?id=${encodeURIComponent(category)}`,
+                { 
+                  timeout: 20000,  // 增加超时时间
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Referer': 'http://www.91kds.cn/'
+                  }
+                }
+              );
               
-              // 记录API使用统计
-              if (!apiUsageStats[apiSource]) {
-                apiUsageStats[apiSource] = 0;
-              }
-              apiUsageStats[apiSource]++;
-              
-              if (!channels || channels.length === 0) {
+              if (!response.data || !Array.isArray(response.data)) {
                 console.log(`分类 ${category} 无数据，使用默认频道`);
-                m3uContent += `# 分类: ${category} (API: ${apiSource})\n`;
+                m3uContent += `# 分类: ${category}\n`;
                 m3uContent += `#EXTINF:-1 tvg-id="default_${category}" tvg-name="${category}" group-title="${category}",${category}\n`;
                 m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n\n`;
                 continue;
               }
               
-              console.log(`分类 ${category} 有 ${channels.length} 个频道 (来自: ${apiSource})`);
-              m3uContent += `# 分类: ${category} (API: ${apiSource})\n`;
+              console.log(`分类 ${category} 有 ${response.data.length} 个频道`);
+              m3uContent += `# 分类: ${category}\n`;
               
-              // 处理每个频道
-              for (const channel of channels) {
+              // 处理每个频道（不跳过任何频道）
+              for (const channel of response.data) {
                 try {
                   const nwtime = Math.floor(Date.now() / 1000);
-                  const ev = category === '虎牙' ? '20250113' : '20240918';
+                  let sign, apiUrl, ev;
                   
-                  console.log(`处理频道: ${channel.name} (EV: ${ev})`);
-                  
-                  // 使用多API源获取播放源
-                  const sourceResult = await getSourceListWithMultipleAPIs(channel.ename, category);
-                  const sources = sourceResult.data.liveSource || [];
-                  const sourceNames = sourceResult.data.liveSourceName || [];
-                  const sourceApi = sourceResult.source;
-                  
-                  // 记录源API使用统计
-                  if (!apiUsageStats[sourceApi]) {
-                    apiUsageStats[sourceApi] = 0;
+                  // 特别处理虎牙分类
+                  if (category === '虎牙') {
+                    ev = '20250113';
+                    sign = generateSignature(channel.ename, nwtime, ev);
+                    apiUrl = `http://api.91kds.cn/zone/srclist?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20250113`;
+                  } else {
+                    ev = '20240918';
+                    sign = generateSignature(channel.ename, nwtime, ev);
+                    apiUrl = `http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=20240918`;
                   }
-                  apiUsageStats[sourceApi]++;
                   
-                  if (sources.length === 0) {
+                  console.log(`处理频道 ${channel.name} 签名: ${sign.substring(0, 8)}...`);
+                  
+                  // 获取播放源
+                  const sourceRes = await axios.get(apiUrl, { 
+                    timeout: 20000,  // 增加超时时间
+                    headers: {
+                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                      'Referer': 'http://www.91kds.cn/'
+                    }
+                  });
+                  
+                  if (sourceRes.data?.liveSource && Array.isArray(sourceRes.data.liveSource)) {
+                    const sources = sourceRes.data.liveSource;
+                    const sourceNames = sourceRes.data.liveSourceName || [];
+                    
+                    console.log(`频道 ${channel.name} 有 ${sources.length} 个播放源`);
+                    
+                    // 添加频道信息
+                    m3uContent += `#EXTINF:-1 tvg-id="${channel.ename}" tvg-name="${channel.name}" tvg-logo="${channel.icon}" group-title="${category}",${channel.name}\n`;
+                    
+                    // 为每个播放源添加完整认证参数（不跳过任何播放源）
+                    for (let i = 0; i < sources.length; i++) {
+                      let sourceUrl = sources[i];
+                      const sourceName = sourceNames[i] || `线路${i + 1}`;
+                      
+                      console.log(`原始URL ${i + 1}: ${sourceUrl.substring(0, 100)}...`);
+                      
+                      // 为URL添加完整认证参数
+                      const fullUrl = addFullAuthParams(sourceUrl, channel.ename, nwtime, ev);
+                      console.log(`完整认证URL ${i + 1}: ${fullUrl.substring(0, 150)}...`);
+                      
+                      // 添加播放源
+                      m3uContent += `${fullUrl}\n`;
+                      totalStreams++;
+                    }
+                    
+                    totalChannels++;
+                  } else {
+                    // 如果没有播放源，添加默认源
                     console.log(`频道 ${channel.name} 无播放源，使用默认源`);
                     m3uContent += `#EXTINF:-1 tvg-id="${channel.ename}" tvg-name="${channel.name}" tvg-logo="${channel.icon}" group-title="${category}",${channel.name}\n`;
                     m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n`;
                     totalChannels++;
                     totalStreams++;
-                    continue;
                   }
-                  
-                  console.log(`频道 ${channel.name} 有 ${sources.length} 个播放源 (来自: ${sourceApi})`);
-                  
-                  // 添加频道信息
-                  m3uContent += `#EXTINF:-1 tvg-id="${channel.ename}" tvg-name="${channel.name}" tvg-logo="${channel.icon}" group-title="${category}",${channel.name}\n`;
-                  
-                  // 处理每个播放源
-                  for (let i = 0; i < sources.length; i++) {
-                    const sourceUrl = sources[i];
-                    const sourceName = sourceNames[i] || `线路${i + 1}`;
-                    
-                    console.log(`原始URL ${i + 1}: ${sourceUrl.substring(0, 100)}...`);
-                    
-                    // 处理特殊URL类型
-                    const finalUrl = processSpecialUrlTypes(sourceUrl, channel.ename, nwtime, ev, category);
-                    
-                    console.log(`处理后的URL ${i + 1}: ${finalUrl.substring(0, 150)}...`);
-                    
-                    // 添加播放源
-                    m3uContent += `${finalUrl}\n`;
-                    totalStreams++;
-                  }
-                  
-                  totalChannels++;
-                  
-                  // 添加延迟避免请求过快
-                  await new Promise(resolve => setTimeout(resolve, 500));
                   
                 } catch (error) {
                   console.log(`处理频道 ${channel.name} 失败: ${error.message}`);
@@ -352,13 +202,13 @@ jobs:
                   totalChannels++;
                   totalStreams++;
                 }
+                
+                // 添加延迟避免请求过快
+                await new Promise(resolve => setTimeout(resolve, 500));
               }
               
               m3uContent += '\n';
               successfulCategories++;
-              
-              // 添加延迟避免请求过快
-              await new Promise(resolve => setTimeout(resolve, 1000));
               
             } catch (error) {
               console.log(`处理分类 ${category} 失败: ${error.message}`);
@@ -367,6 +217,9 @@ jobs:
               m3uContent += `#EXTINF:-1 tvg-id="default_${category}" tvg-name="${category}" group-title="${category}",${category}\n`;
               m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n\n`;
             }
+            
+            // 添加延迟避免请求过快
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
           
           // 添加统计信息
@@ -378,76 +231,56 @@ jobs:
           m3uContent += `# 播放源总数: ${totalStreams}\n`;
           m3uContent += `# 生成耗时: ${duration}秒\n`;
           m3uContent += `# 更新时间: ${getBeijingTime()}\n`;
-          m3uContent += `# API使用统计:\n`;
-          
-          for (const [api, count] of Object.entries(apiUsageStats)) {
-            m3uContent += `# - ${api}: ${count} 次使用\n`;
-          }
-          
-          m3uContent += `# 版本: 多API源巡查版\n`;
-          m3uContent += `# 说明: 使用多个API源提高稳定性，支持jsb类型URL\n`;
-          m3uContent += `# 支持的URL类型:\n`;
-          m3uContent += `# - http://utuxx.91kds.cn/live1/huya.m3u8? (虎牙专用)\n`;
-          m3uContent += `# - http://utuxx.91kds.cn/live1/jsb.m3u8? (jsb类型)\n`;
-          m3uContent += `# - 其他标准直播流URL\n`;
+          m3uContent += `# 版本: 完整版 - 不删减任何分类和频道\n`;
+          m3uContent += `# 说明: 为每个播放URL添加完整的认证参数\n`;
+          m3uContent += `# 认证参数: app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&utk=&nwtime=...&ev=...&sign=...\n`;
+          m3uContent += `# 普通分类: ev=20240918\n`;
+          m3uContent += `# 虎牙分类: ev=20250113\n`;
           
           // 保存文件
           fs.writeFileSync('91ktv.m3u', m3uContent);
           
-          console.log('\n=== 生成完成! ===');
-          console.log(`分类数: ${categories.length}`);
+          console.log('生成完成!');
+          console.log(`分类数: ${categories.length}（完整不删减）`);
           console.log(`成功分类数: ${successfulCategories}`);
-          console.log(`频道数: ${totalChannels}`);
-          console.log(`播放源数: ${totalStreams}`);
+          console.log(`频道数: ${totalChannels}（完整不删减）`);
+          console.log(`播放源数: ${totalStreams}（完整不删减）`);
           console.log(`耗时: ${duration}秒`);
-          console.log(`\n=== API使用统计 ===`);
-          for (const [api, count] of Object.entries(apiUsageStats)) {
-            console.log(`- ${api}: ${count} 次使用`);
-          }
         }
         
         main().catch(console.error);
         EOF
         
-        echo "开始生成完整版直播源（多API源巡查）..."
+        echo "开始生成完整版直播源（不删减任何分类和频道）..."
         node generate_full.js
 
-    - name: 验证多API源结果
+    - name: 验证完整性
       run: |
-        echo "=== 多API源巡查验证 ==="
-        if [ -f 91ktv.m3u ]; then
-          echo "文件大小: $(wc -c < 91ktv.m3u) 字节"
-          echo "播放源数量: $(grep -c '^http' 91ktv.m3u)"
-          echo "频道数量: $(grep -c '^#EXTINF' 91ktv.m3u)"
-          echo ""
-          echo "=== URL类型验证 ==="
-          echo "虎牙URL数量: $(grep -c 'utuxx.91kds.cn/live1/huya.m3u8' 91ktv.m3u)"
-          echo "jsb URL数量: $(grep -c 'utuxx.91kds.cn/live1/jsb.m3u8' 91ktv.m3u)"
-          echo "其他utuxx URL数量: $(grep -c 'utuxx.91kds.cn' 91ktv.m3u | grep -v 'huya.m3u8' | grep -v 'jsb.m3u8' | wc -l)"
-          echo ""
-          echo "=== 认证参数验证 ==="
-          echo "包含认证参数的URL数量: $(grep -c 'app=com.jiaoxiang.fangnale' 91ktv.m3u)"
-          echo "虎牙专用ev=20250113: $(grep -c 'ev=20250113' 91ktv.m3u)"
-          echo "普通分类ev=20240918: $(grep -c 'ev=20240918' 91ktv.m3u)"
-          echo ""
-          echo "=== API源统计验证 ==="
-          echo "API使用统计:"
-          grep -A10 '# API使用统计:' 91ktv.m3u
-          echo ""
-          echo "=== 示例URL ==="
-          echo "虎牙示例: $(grep -m1 'utuxx.91kds.cn/live1/huya.m3u8' 91ktv.m3u | head -1 | cut -d'?' -f1)"
-          echo "jsb示例: $(grep -m1 'utuxx.91kds.cn/live1/jsb.m3u8' 91ktv.m3u | head -1 | cut -d'?' -f1)"
-          echo ""
-          echo "=== 统计信息 ==="
-          tail -20 91ktv.m3u
-        else
-          echo "文件未生成"
-        fi
+        echo "=== 完整性验证 ==="
+        echo "文件大小: $(wc -c < 91ktv.m3u) 字节"
+        echo "总行数: $(wc -l < 91ktv.m3u)"
+        echo "播放源数量: $(grep -c '^http' 91ktv.m3u)"
+        echo "频道数量: $(grep -c '^#EXTINF' 91ktv.m3u)"
+        echo ""
+        echo "=== 认证参数验证 ==="
+        echo "包含完整认证参数的URL数量: $(grep -c 'app=com\.jiaoxiang\.fangnale' 91ktv.m3u)"
+        echo "包含utuxx.91kds.cn的URL数量: $(grep -c 'utuxx\.91kds\.cn' 91ktv.m3u)"
+        echo "包含完整签名的URL数量: $(grep -c 'sign=' 91ktv.m3u)"
+        echo ""
+        echo "=== 分类完整性验证 ==="
+        echo "处理的所有分类:"
+        grep -o 'group-title="[^"]*"' 91ktv.m3u | sort | uniq -c | head -20
+        echo ""
+        echo "=== 示例URL（检查格式）==="
+        grep -E 'utuxx\.91kds\.cn.*app=com\.jiaoxiang\.fangnale' 91ktv.m3u | head -3
+        echo ""
+        echo "=== 统计信息 ==="
+        tail -15 91ktv.m3u
 
     - name: 提交更新
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git add 91ktv.m3u
-        git commit -m "多API源巡查版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
+        git commit -m "完整版直播源更新（不删减任何分类和频道） $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
         git push
