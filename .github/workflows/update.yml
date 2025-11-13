@@ -42,7 +42,7 @@ jobs:
         }
         
         // 生成签名
-        function generateSignature(ename, nwtime, ev = '20240918') {
+        function generateSignature(ename, nwtime, ev = '20250113') {
           const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff';
           const srcKey = ename + appKey + nwtime + ev;
           return CryptoJS.MD5(srcKey).toString();
