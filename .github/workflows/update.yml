@@ -21,7 +21,7 @@ jobs:
     - name: 安装依赖
       run: npm install axios crypto-js
 
-    - name: 生成完整版直播源（API智能选择ev和id）
+    - name: 生成完整版直播源（全分类智能选择ev和id）
       run: |
         cat > generate_full.js << 'EOF'
         const axios = require('axios');
@@ -60,7 +60,16 @@ jobs:
           return match ? match[0] : ename;
         }
         
-        // 智能确定ev参数 - 基于API响应
+        // 获取API URL（根据分类类型）
+        function getApiUrl(category, ename, nwtime, sign, ev) {
+          if (category === '虎牙') {
+            return `http://api.91kds.cn/zone/srclist?ename=${ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
+          } else {
+            return `http://sjapi1.91kds.cn/api/get_source.php?ename=${ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
+          }
+        }
+        
+        // 智能确定ev参数 - 基于API响应（所有分类都使用相同逻辑）
         async function determineEvParam(ename, category, nwtime) {
           const testEvValues = ['20250113', '20240918'];
           const headers = {
@@ -68,25 +77,13 @@ jobs:
             'Referer': 'http://www.91kds.cn/'
           };
           
-          // 虎牙分类固定使用20250113
-          if (category === '虎牙') {
-            console.log(`虎牙分类固定使用ev: 20250113`);
-            return '20250113';
-          }
-          
-          // 测试不同的ev值
+          // 测试不同的ev值（包括虎牙分类）
           for (const ev of testEvValues) {
             try {
               const sign = generateSignature(ename, nwtime, ev);
-              let apiUrl;
+              const apiUrl = getApiUrl(category, ename, nwtime, sign, ev);
               
-              if (category === '虎牙') {
-                apiUrl = `http://api.91kds.cn/zone/srclist?ename=${ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
-              } else {
-                apiUrl = `http://sjapi1.91kds.cn/api/get_source.php?ename=${ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
-              }
-              
-              console.log(`测试ev值: ${ev} - URL: ${apiUrl.substring(0, 100)}...`);
+              console.log(`分类 ${category} 测试ev值: ${ev} - URL: ${apiUrl.substring(0, 100)}...`);
               
               const response = await axios.get(apiUrl, {
                 timeout: 10000,
@@ -95,21 +92,21 @@ jobs:
               
               // 检查响应是否有效
               if (response.data && response.data.liveSource && Array.isArray(response.data.liveSource) && response.data.liveSource.length > 0) {
-                console.log(`ev值 ${ev} 测试成功，获取到 ${response.data.liveSource.length} 个播放源`);
+                console.log(`分类 ${category} ev值 ${ev} 测试成功，获取到 ${response.data.liveSource.length} 个播放源`);
                 return ev;
               }
               
             } catch (error) {
-              console.log(`ev值 ${ev} 测试失败: ${error.message}`);
+              console.log(`分类 ${category} ev值 ${ev} 测试失败: ${error.message}`);
             }
           }
           
           // 如果所有ev值都失败，使用默认值
-          console.log(`所有ev值测试失败，使用默认值: 20250113`);
+          console.log(`分类 ${category} 所有ev值测试失败，使用默认值: 20250113`);
           return '20250113';
         }
         
-        // 为URL添加完整认证参数（智能处理ID参数）
+        // 为URL添加完整认证参数（智能处理ID参数，所有分类统一处理）
         function addFullAuthParams(baseUrl, ename, nwtime, ev) {
           const sign = generateSignature(ename, nwtime, ev);
           const id = extractId(ename);
@@ -141,7 +138,6 @@ jobs:
           if (!params.has('id') || /^\d+$/.test(params.get('id'))) {
             params.set('id', id);
           }
-          // 否则保留原始id参数值
           
           // 添加其他认证参数
           params.set('app', 'com.jiaoxiang.fangnale');
@@ -156,13 +152,13 @@ jobs:
         }
         
         async function main() {
-          console.log('开始生成完整版直播源（API智能选择ev和id）...');
+          console.log('开始生成完整版直播源（全分类智能选择ev和id）...');
           const startTime = Date.now();
           const currentTime = getBeijingTime();
           
           let m3uContent = '#EXTM3U\n';
           m3uContent += `# 91ktv直播源更新时间: ${currentTime}\n`;
-          m3uContent += `# 版本: 完整版 - API智能选择ev和id\n\n`;
+          m3uContent += `# 版本: 完整版 - 全分类智能选择ev和id\n\n`;
           
           // 添加更新时间频道
           m3uContent += `#EXTINF:-1 tvg-id="UPDATE_TIME" tvg-name="更新时间: ${currentTime}" group-title="信息",更新时间: ${currentTime}\n`;
@@ -172,6 +168,7 @@ jobs:
           let totalStreams = 0;
           let successfulCategories = 0;
           let evUsageStats = { '20250113': 0, '20240918': 0 };
+          let categoryEvStats = {};
           
           // 完整分类列表
           const categories = [
@@ -188,6 +185,7 @@ jobs:
           for (const category of categories) {
             try {
               console.log(`处理分类: ${category}`);
+              categoryEvStats[category] = { '20250113': 0, '20240918': 0 };
               
               // 获取频道列表
               const response = await axios.get(
@@ -219,21 +217,18 @@ jobs:
                   
                   console.log(`处理频道: ${channel.name} (ename: ${channel.ename})`);
                   
-                  // 智能确定ev参数
+                  // 智能确定ev参数（所有分类都使用相同逻辑）
                   const ev = await determineEvParam(channel.ename, category, nwtime);
                   const sign = generateSignature(channel.ename, nwtime, ev);
                   
                   // 记录ev使用统计
                   evUsageStats[ev] = (evUsageStats[ev] || 0) + 1;
+                  categoryEvStats[category][ev] = (categoryEvStats[category][ev] || 0) + 1;
                   
-                  let apiUrl;
-                  if (category === '虎牙') {
-                    apiUrl = `http://api.91kds.cn/zone/srclist?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
-                  } else {
-                    apiUrl = `http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
-                  }
+                  // 获取API URL
+                  const apiUrl = getApiUrl(category, channel.ename, nwtime, sign, ev);
                   
-                  console.log(`使用ev值: ${ev}, 签名: ${sign.substring(0, 8)}...`);
+                  console.log(`分类 ${category} 使用ev值: ${ev}, 签名: ${sign.substring(0, 8)}...`);
                   
                   // 获取播放源
                   const sourceRes = await axios.get(apiUrl, { 
@@ -260,7 +255,7 @@ jobs:
                       
                       console.log(`原始URL ${i + 1}: ${sourceUrl.substring(0, 100)}...`);
                       
-                      // 为URL添加完整认证参数
+                      // 为URL添加完整认证参数（所有分类统一处理）
                       const fullUrl = addFullAuthParams(sourceUrl, channel.ename, nwtime, ev);
                       console.log(`智能处理URL ${i + 1}: ${fullUrl.substring(0, 150)}...`);
                       
@@ -324,12 +319,15 @@ jobs:
           m3uContent += `# 播放源总数: ${totalStreams}\n`;
           m3uContent += `# 生成耗时: ${duration}秒\n`;
           m3uContent += `# 更新时间: ${getBeijingTime()}\n`;
-          m3uContent += `# ev参数使用统计:\n`;
+          m3uContent += `# 全局ev参数使用统计:\n`;
           m3uContent += `# - 20250113: ${evUsageStats['20250113'] || 0} 个频道\n`;
           m3uContent += `# - 20240918: ${evUsageStats['20240918'] || 0} 个频道\n`;
-          m3uContent += `# 版本: 完整版 - API智能选择ev和id\n`;
-          m3uContent += `# 说明: 根据API响应智能选择ev参数，虎牙分类固定使用20250113\n`;
-          m3uContent += `# ID处理: 智能提取有意义的ID，避免重复id参数问题\n`;
+          m3uContent += `# 各分类ev参数使用统计:\n`;
+          for (const category in categoryEvStats) {
+            m3uContent += `# - ${category}: 20250113=${categoryEvStats[category]['20250113'] || 0}, 20240918=${categoryEvStats[category]['20240918'] || 0}\n`;
+          }
+          m3uContent += `# 版本: 完整版 - 全分类智能选择ev和id\n`;
+          m3uContent += `# 说明: 所有分类都根据API响应智能选择ev参数，智能处理ID参数\n`;
           
           // 保存文件
           fs.writeFileSync('91ktv.m3u', m3uContent);
@@ -339,44 +337,49 @@ jobs:
           console.log(`成功分类数: ${successfulCategories}`);
           console.log(`频道数: ${totalChannels}`);
           console.log(`播放源数: ${totalStreams}`);
-          console.log(`ev参数使用统计:`);
+          console.log(`全局ev参数使用统计:`);
           console.log(`- 20250113: ${evUsageStats['20250113'] || 0} 个频道`);
           console.log(`- 20240918: ${evUsageStats['20240918'] || 0} 个频道`);
+          console.log(`各分类ev参数使用统计:`);
+          for (const category in categoryEvStats) {
+            console.log(`- ${category}: 20250113=${categoryEvStats[category]['20250113'] || 0}, 20240918=${categoryEvStats[category]['20240918'] || 0}`);
+          }
           console.log(`耗时: ${duration}秒`);
         }
         
         main().catch(console.error);
         EOF
         
-        echo "开始生成完整版直播源（API智能选择ev和id）..."
+        echo "开始生成完整版直播源（全分类智能选择ev和id）..."
         node generate_full.js
 
-    - name: 验证API智能选择
+    - name: 验证全分类智能选择
       run: |
-        echo "=== API智能选择验证 ==="
+        echo "=== 全分类智能选择验证 ==="
         if [ -f 91ktv.m3u ]; then
           echo "文件大小: $(wc -c < 91ktv.m3u) 字节"
           echo "播放源数量: $(grep -c '^http' 91ktv.m3u)"
           echo "频道数量: $(grep -c '^#EXTINF' 91ktv.m3u)"
           echo ""
-          echo "=== ev参数验证 ==="
+          echo "=== 全局ev参数验证 ==="
           echo "20250113使用次数: $(grep -c 'ev=20250113' 91ktv.m3u)"
           echo "20240918使用次数: $(grep -c 'ev=20240918' 91ktv.m3u)"
+          echo ""
+          echo "=== 虎牙分类ev参数验证 ==="
+          echo "虎牙分类频道数: $(grep -c 'group-title=\"虎牙\"' 91ktv.m3u)"
+          echo "虎牙分类使用20250113: $(grep -A1 'group-title=\"虎牙\"' 91ktv.m3u | grep -c 'ev=20250113')"
+          echo "虎牙分类使用20240918: $(grep -A1 'group-title=\"虎牙\"' 91ktv.m3u | grep -c 'ev=20240918')"
           echo ""
           echo "=== ID参数验证 ==="
           echo "检查是否有重复id参数:"
           grep -E "id=.*&.*id=" 91ktv.m3u | head -3 || echo "未发现重复id参数"
           echo ""
-          echo "=== 虎牙分类验证 ==="
-          echo "虎牙分类频道数: $(grep -c 'group-title=\"虎牙\"' 91ktv.m3u)"
-          echo "虎牙分类使用ev=20250113: $(grep -A1 'group-title=\"虎牙\"' 91ktv.m3u | grep -c 'ev=20250113')"
-          echo ""
           echo "=== 示例URL验证 ==="
-          echo "CCTV频道ID示例: $(grep -A1 'CCTV' 91ktv.m3u | grep 'id=' | head -1 | sed 's/&/\\n    &/g')"
-          echo "卫视频道ID示例: $(grep -A1 '卫视' 91ktv.m3u | grep 'id=' | head -1 | sed 's/&/\\n    &/g')"
+          echo "虎牙示例(20250113): $(grep -A1 'group-title=\"虎牙\"' 91ktv.m3u | grep 'ev=20250113' | head -1 | sed 's/&/\\n    &/g')"
+          echo "虎牙示例(20240918): $(grep -A1 'group-title=\"虎牙\"' 91ktv.m3u | grep 'ev=20240918' | head -1 | sed 's/&/\\n    &/g' 2>/dev/null || echo '无')"
           echo ""
           echo "=== 统计信息 ==="
-          tail -15 91ktv.m3u
+          tail -20 91ktv.m3u | head -15
         else
           echo "文件未生成"
         fi
@@ -386,5 +389,5 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git add 91ktv.m3u
-        git commit -m "API智能选择ev和id版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
+        git commit -m "全分类智能选择ev和id版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
         git push
