@@ -277,7 +277,7 @@ jobs:
               console.log(`处理分类 ${category} 失败: ${error.message}`);
               // 即使失败也保存分类信息
               m3uContent += `# 分类: ${category}\n`;
-              m3uContent += `#EXTINF:-1 tvg-id="default_${category}" t极g-name="${category}" group-title="${category}",${category}\n`;
+              m3uContent += `#EXTINF:-1 tvg-id="default_${category}" tvg-name="${category}" group-title="${category}",${category}\n`;
               m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n\n`;
             }
             
@@ -289,7 +289,7 @@ jobs:
           const duration = Math.round((Date.now() - startTime) / 1000);
           m3uContent += `# 统计信息:\n`;
           m3uContent += `# 处理分类数: ${categories.length}\n`;
-          m3uContent += `# 成功分类极: ${successfulCategories}\n`;
+          m3uContent += `# 成功分类数: ${successfulCategories}\n`;
           m3uContent += `# 频道总数: ${totalChannels}\n`;
           m3uContent += `# 播放源总数: ${totalStreams}\n`;
           m3uContent += `# 生成耗时: ${duration}秒\n`;
