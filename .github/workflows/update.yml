@@ -43,7 +43,7 @@ jobs:
         
         // 生成签名
         function generateSignature(ename, nwtime, ev = '20250113') {
-          const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfak极buyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff';
+          const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff';
           const srcKey = ename + appKey + nwtime + ev;
           return CryptoJS.MD5(srcKey).toString();
         }
@@ -154,7 +154,7 @@ jobs:
           // 完整分类列表（不删减任何分类）
           const categories = [
             '央视', '卫视', '高清', '4K', '影视', '体育', '新闻', '财经', '综艺', '教育',
-            '纪录', '国际', '网络极 '购物', '虎牙', '安徽', '北京', '重庆', '福建',
+            '纪录', '国际', '网络', '购物', '虎牙', '安徽', '北京', '重庆', '福建',
             '甘肃', '湖北', '湖南', '吉林', '江苏', '江西', '辽宁', '内蒙古', '宁夏', '青海',
             '山东', '山西', '陕西', '上海', '贵州', '海南', '河北', '河南', '黑龙江', '天津',
             '新疆', '西藏', '云南', '浙江', '广西', '广东', '四川'
@@ -173,8 +173,8 @@ jobs:
                 { 
                   timeout: 20000,
                   headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64极 AppleWebKit/537.36',
-                    'Referer': 'http://www.91极ds.cn/'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Referer': 'http://www.91kds.cn/'
                   }
                 }
               );
@@ -208,7 +208,7 @@ jobs:
                   if (category === '虎牙') {
                     apiUrl = `http://api.91kds.cn/zone/srclist?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
                   } else {
-                    apiUrl = `http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:极f&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
+                    apiUrl = `http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
                   }
                   
                   console.log(`使用ev值: ${ev}, 签名: ${sign.substring(0, 8)}...`);
@@ -252,7 +252,7 @@ jobs:
                     // 如果没有播放源，添加默认源
                     console.log(`频道 ${channel.name} 无播放源，使用默认源`);
                     m3uContent += `#EXTINF:-1 tvg-id="${channel.ename}" tvg-name="${channel.name}" tvg-logo="${channel.icon}" group-title="${category}",${channel.name}\n`;
-                    m3uContent += `https://demo.unified-streaming.com/k8极/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n`;
+                    m3uContent += `https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8\n`;
                     totalChannels++;
                     totalStreams++;
                   }
