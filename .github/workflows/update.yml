@@ -112,7 +112,7 @@ jobs:
           // 解析基础URL
           let url = baseUrl;
           if (url.startsWith('kdsvod://')) {
-            url = url.replace('kdsvod://', 'http://');
+            url = url.replace('kdsvod://', '');
           }
           
           // 检查是否已有查询参数
