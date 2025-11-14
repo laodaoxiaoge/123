@@ -21,13 +21,12 @@ jobs:
     - name: 安装依赖
       run: npm install axios crypto-js
 
-    - name: 生成完整版直播源（修复ID参数问题）
+    - name: 生成完整版直播源（API智能选择ev和id）
       run: |
         cat > generate_full.js << 'EOF'
         const axios = require('axios');
         const CryptoJS = require('crypto-js');
         const fs = require('fs');
-        const { URL, URLSearchParams } = require('url');
         
         // 获取北京时间
         function getBeijingTime() {
@@ -43,22 +42,22 @@ jobs:
         }
         
         // 生成签名
-        function generateSignature(ename, nwtime, ev = '20250113') {
+        function generateSignature(ename, nwtime, ev) {
           const appKey = 'com.jiaoxiang.fangnaleahkajfkahlajjaflfakhfakfbuyaozaigaolefuquqikangbuzhu2.3.4fu:ck:92:92:ff';
           const srcKey = ename + appKey + nwtime + ev;
           return CryptoJS.MD5(srcKey).toString();
         }
         
-        // 从ename中提取有意义的ID
+        // 从ename中智能提取ID
         function extractId(ename) {
-          // 如果ename已经是ID格式（如cctv1hd），直接返回
+          // 如果ename已经是频道ID格式，直接返回
           if (ename && (ename.includes('cctv') || ename.includes('tv') || /^[a-zA-Z]+\d+/.test(ename))) {
-            return ename.replace(/hd$/, ''); // 移除hd后缀
+            return ename;
           }
           
           // 否则提取数字部分
           const match = ename.match(/\d+/);
-          return match ? match[0] : '11342412';
+          return match ? match[0] : ename;
         }
         
         // 智能确定ev参数 - 基于API响应
@@ -66,7 +65,7 @@ jobs:
           const testEvValues = ['20250113', '20240918'];
           const headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': '链接2'
+            'Referer': 'http://www.91kds.cn/'
           };
           
           // 虎牙分类固定使用20250113
@@ -84,7 +83,7 @@ jobs:
               if (category === '虎牙') {
                 apiUrl = `http://api.91kds.cn/zone/srclist?ename=${ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
               } else {
-                apiUrl = `链接3${ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
+                apiUrl = `http://sjapi1.91kds.cn/api/get_source.php?ename=${ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
               }
               
               console.log(`测试ev值: ${ev} - URL: ${apiUrl.substring(0, 100)}...`);
@@ -110,7 +109,7 @@ jobs:
           return '20250113';
         }
         
-        // 为URL添加完整认证参数（修复ID参数问题）
+        // 为URL添加完整认证参数（智能处理ID参数）
         function addFullAuthParams(baseUrl, ename, nwtime, ev) {
           const sign = generateSignature(ename, nwtime, ev);
           const id = extractId(ename);
@@ -138,13 +137,13 @@ jobs:
           // 创建新的参数对象
           const params = new URLSearchParams(existingParams);
           
-          // 如果原始URL没有id参数，或者id参数是数字，则使用提取的ID
+          // 智能处理ID参数：如果原始URL已经有有意义的ID，则保留；否则使用提取的ID
           if (!params.has('id') || /^\d+$/.test(params.get('id'))) {
             params.set('id', id);
           }
           // 否则保留原始id参数值
           
-          // 添加其他认证参数（会覆盖同名参数）
+          // 添加其他认证参数
           params.set('app', 'com.jiaoxiang.fangnale');
           params.set('version', '2.3.4');
           params.set('mac', 'fu:ck:92:92:ff');
@@ -157,13 +156,13 @@ jobs:
         }
         
         async function main() {
-          console.log('开始生成完整版直播源（修复ID参数问题）...');
+          console.log('开始生成完整版直播源（API智能选择ev和id）...');
           const startTime = Date.now();
           const currentTime = getBeijingTime();
           
           let m3uContent = '#EXTM3U\n';
           m3uContent += `# 91ktv直播源更新时间: ${currentTime}\n`;
-          m3uContent += `# 版本: 完整版 - 修复ID参数问题\n\n`;
+          m3uContent += `# 版本: 完整版 - API智能选择ev和id\n\n`;
           
           // 添加更新时间频道
           m3uContent += `#EXTINF:-1 tvg-id="UPDATE_TIME" tvg-name="更新时间: ${currentTime}" group-title="信息",更新时间: ${currentTime}\n`;
@@ -192,12 +191,12 @@ jobs:
               
               // 获取频道列表
               const response = await axios.get(
-                `链接1${encodeURIComponent(category)}`,
+                `http://sj.91kds.cn/api/get_channel.php?id=${encodeURIComponent(category)}`,
                 { 
                   timeout: 20000,
                   headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': '链接2'
+                    'Referer': 'http://www.91kds.cn/'
                   }
                 }
               );
@@ -231,7 +230,7 @@ jobs:
                   if (category === '虎牙') {
                     apiUrl = `http://api.91kds.cn/zone/srclist?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
                   } else {
-                    apiUrl = `链接3${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
+                    apiUrl = `http://sjapi1.91kds.cn/api/get_source.php?ename=${channel.ename}&app=com.jiaoxiang.fangnale&version=2.3.4&mac=fu:ck:92:92:ff&nwtime=${nwtime}&sign=${sign}&ev=${ev}`;
                   }
                   
                   console.log(`使用ev值: ${ev}, 签名: ${sign.substring(0, 8)}...`);
@@ -241,7 +240,7 @@ jobs:
                     timeout: 20000,
                     headers: {
                       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                      'Referer': '链接2'
+                      'Referer': 'http://www.91kds.cn/'
                     }
                   });
                   
@@ -263,7 +262,7 @@ jobs:
                       
                       // 为URL添加完整认证参数
                       const fullUrl = addFullAuthParams(sourceUrl, channel.ename, nwtime, ev);
-                      console.log(`修复后URL ${i + 1}: ${fullUrl.substring(0, 150)}...`);
+                      console.log(`智能处理URL ${i + 1}: ${fullUrl.substring(0, 150)}...`);
                       
                       // 检查ID参数是否正确
                       if (fullUrl.includes('id=')) {
@@ -328,8 +327,9 @@ jobs:
           m3uContent += `# ev参数使用统计:\n`;
           m3uContent += `# - 20250113: ${evUsageStats['20250113'] || 0} 个频道\n`;
           m3uContent += `# - 20240918: ${evUsageStats['20240918'] || 0} 个频道\n`;
-          m3uContent += `# 版本: 完整版 - 修复ID参数问题\n`;
-          m3uContent += `# 说明: 智能处理ID参数，避免重复id问题\n`;
+          m3uContent += `# 版本: 完整版 - API智能选择ev和id\n`;
+          m3uContent += `# 说明: 根据API响应智能选择ev参数，虎牙分类固定使用20250113\n`;
+          m3uContent += `# ID处理: 智能提取有意义的ID，避免重复id参数问题\n`;
           
           // 保存文件
           fs.writeFileSync('91ktv.m3u', m3uContent);
@@ -348,27 +348,35 @@ jobs:
         main().catch(console.error);
         EOF
         
-        echo "开始生成完整版直播源（修复ID参数问题）..."
+        echo "开始生成完整版直播源（API智能选择ev和id）..."
         node generate_full.js
 
-    - name: 验证ID参数修复
+    - name: 验证API智能选择
       run: |
-        echo "=== ID参数验证 ==="
+        echo "=== API智能选择验证 ==="
         if [ -f 91ktv.m3u ]; then
           echo "文件大小: $(wc -c < 91ktv.m3u) 字节"
           echo "播放源数量: $(grep -c '^http' 91ktv.m3u)"
           echo "频道数量: $(grep -c '^#EXTINF' 91ktv.m3u)"
           echo ""
-          echo "=== ID参数示例验证 ==="
+          echo "=== ev参数验证 ==="
+          echo "20250113使用次数: $(grep -c 'ev=20250113' 91ktv.m3u)"
+          echo "20240918使用次数: $(grep -c 'ev=20240918' 91ktv.m3u)"
+          echo ""
+          echo "=== ID参数验证 ==="
           echo "检查是否有重复id参数:"
           grep -E "id=.*&.*id=" 91ktv.m3u | head -3 || echo "未发现重复id参数"
           echo ""
-          echo "=== ID参数值验证 ==="
-          echo "CCTV相关频道的ID值:"
-          grep -A1 "CCTV" 91ktv.m3u | grep "id=" | head -5
-          echo ""
           echo "=== 虎牙分类验证 ==="
           echo "虎牙分类频道数: $(grep -c 'group-title=\"虎牙\"' 91ktv.m3u)"
+          echo "虎牙分类使用ev=20250113: $(grep -A1 'group-title=\"虎牙\"' 91ktv.m3u | grep -c 'ev=20250113')"
+          echo ""
+          echo "=== 示例URL验证 ==="
+          echo "CCTV频道ID示例: $(grep -A1 'CCTV' 91ktv.m3u | grep 'id=' | head -1 | sed 's/&/\\n    &/g')"
+          echo "卫视频道ID示例: $(grep -A1 '卫视' 91ktv.m3u | grep 'id=' | head -1 | sed 's/&/\\n    &/g')"
+          echo ""
+          echo "=== 统计信息 ==="
+          tail -15 91ktv.m3u
         else
           echo "文件未生成"
         fi
@@ -378,5 +386,5 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git add 91ktv.m3u
-        git commit -m "修复ID参数版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
+        git commit -m "API智能选择ev和id版直播源更新 $(date +'%Y-%m-%d %H:%M')" || echo "无变化"
         git push
