@@ -1,359 +1,38 @@
-name: 🔄 代理检测与自动更新
+name: 🔄 代理检测（语法修复版）
 
 on:
-  # 手动触发
   workflow_dispatch:
-    inputs:
-      environment:
-        description: '运行环境'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - testing
-          - production
-
-  # 定时触发（每6小时运行一次）
   schedule:
     - cron: '0 */6 * * *'
 
-  # 代码推送时触发（当脚本更改时）
-  push:
-    paths:
-      - '.github/workflows/proxy-checker.yml'
-      - 'scripts/proxy-checker.php'
-    branches: [ main, master ]
-
-env:
-  PHP_VERSION: '8.2'
-  TIMEZONE: 'Asia/Shanghai'
-
 jobs:
   proxy-check:
-    name: 🕵️ 代理检测任务
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
     steps:
-    # 步骤1：检出代码
-    - name: 📥 检出仓库代码
+    - name: 📥 检出代码
       uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 0
 
-    # 步骤2：设置PHP环境
     - name: ⚙️ 设置PHP环境
       uses: shivammathur/setup-php@v2
       with:
-        php-version: ${{ env.PHP_VERSION }}
-        extensions: curl, mbstring, json
+        php-version: '8.2'
         tools: composer
 
-    # 步骤3：安装PHP依赖（如有需要）
-    - name: 📦 安装PHP依赖
+    - name: 🔍 语法检查
       run: |
-        echo "安装必要的PHP扩展..."
-        sudo apt-get update
-        sudo apt-get install -y php-curl php-mbstring
-        php -v
-        php -m
+        # 检查PHP语法
+        php -l scripts/proxy-checker.php
+        echo "✅ PHP语法检查通过"
 
-    # 步骤4：创建脚本目录并复制PHP文件
-    - name: 📁 准备脚本文件
+    - name: 🚀 运行修复后的脚本
       run: |
-        echo "创建脚本目录..."
-        mkdir -p scripts
-        ls -la
-        
-        # 如果scripts目录下没有PHP文件，创建示例文件
-        if [ ! -f "scripts/proxy-checker.php" ]; then
-          echo "📝 创建proxy-checker.php脚本文件..."
-          cat > scripts/proxy-checker.php << 'PHP'
-<?php
-// 设置网页输出为纯文本格式
-header("Content-Type: text/plain; charset=utf-8");
-
-// 获取待检测的IP:端口列表（格式：IP:端口）
-function getIpPortList() {
-    $url = "http://yewengood.zone.id/fz.php";
-    
-    // 使用cURL替代file_get_contents，更好的错误处理
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; GitHub-Actions-Proxy-Checker/1.0)',
-        CURLOPT_SSL_VERIFYPEER => false,
-    ]);
-    
-    $content = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($content === false || $httpCode !== 200) {
-        return ["error" => "无法获取IP:端口列表文件，HTTP代码: $httpCode"];
-    }
-    
-    $lines = explode("\n", trim($content));
-    $ipPortList = [];
-    foreach ($lines as $line) {
-        $line = trim($line);
-        // 仅保留符合 IP:端口 格式的记录（IP为IPv4，端口1-65535）
-        if (!empty($line) && preg_match('/\b(?:\d{1,3}\.){3}\d{1,3}:\d{1,5}\b/', $line)) {
-            $ipPortList[] = $line;
-        }
-    }
-    
-    if (empty($ipPortList)) {
-        return ["error" => "IP:端口列表为空或格式错误"];
-    }
-    
-    return $ipPortList;
-}
-
-// 检测单个IP:端口是否有效
-function checkIpPortValid($ip, $port) {
-    $testUrl = "http://{$ip}:{$port}/ywotttv.bj.chinamobile.com/PLTV/88888888/224/3221226550/1.m3u8";
-    
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $testUrl,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 10,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_NOBODY => false, // 改为HEAD请求提高效率
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    // 更严格的验证：需要返回200状态码且有内容
-    return ($httpCode === 200 && $response !== false && strlen(trim($response)) > 100);
-}
-
-// 随机抽取IP:端口检测，有效则直接返回
-function findValidIpPort() {
-    $ipPortList = getIpPortList();
-    if (isset($ipPortList["error"])) {
-        return $ipPortList;
-    }
-    
-    $total = count($ipPortList);
-    echo "找到 {$total} 个IP:端口组合，开始随机检测...\n\n";
-    
-    $tested = [];
-    $maxAttempts = min(20, $total); // GitHub Actions中减少尝试次数
-    
-    for ($i = 1; $i <= $maxAttempts; $i++) {
-        $remaining = array_diff($ipPortList, $tested);
-        if (empty($remaining)) {
-            return ["error" => "所有IP:端口均已检测，无有效结果"];
-        }
-        
-        $randomKey = array_rand($remaining);
-        $currentIpPort = $remaining[$randomKey];
-        list($ip, $port) = explode(':', $currentIpPort, 2);
-        
-        echo "随机检测第 {$i}/{$maxAttempts} 个：{$currentIpPort} ... ";
-        if (checkIpPortValid($ip, $port)) {
-            echo "✅ 有效\n\n";
-            return [
-                "ip" => $ip,
-                "port" => $port,
-                "ip_port" => $currentIpPort,
-                "attempts" => $i
-            ];
-        } else {
-            echo "❌ 无效\n";
-            $tested[] = $currentIpPort;
-        }
-        usleep(500000); // 增加延迟到0.5秒
-    }
-    
-    return ["error" => "已尝试 {$maxAttempts} 次随机检测，未找到有效IP:端口"];
-}
-
-// 替换dz.txt中的IP:端口并输出结果
-function replaceAndOutput() {
-    echo "=== 开始代理检测流程 ===\n";
-    echo "时间: " . date('Y-m-d H:i:s') . "\n\n";
-    
-    // 1. 随机检测并获取有效IP:端口
-    $valid = findValidIpPort();
-    if (isset($valid["error"])) {
-        return "错误：{$valid['error']}";
-    }
-    
-    $newIpPort = $valid["ip_port"];
-    echo "✅ 找到有效代理: {$newIpPort} (尝试次数: {$valid['attempts']})\n\n";
-    
-    // 2. 读取dz.txt内容
-    $dzUrl = "http://yewengood.zone.id/dz.txt";
-    echo "读取目标文件: {$dzUrl}\n";
-    
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $dzUrl,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; GitHub-Actions-Proxy-Checker/1.0)',
-    ]);
-    
-    $dzContent = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($dzContent === false || $httpCode !== 200) {
-        return "错误：无法读取dz.txt文件，HTTP代码: $httpCode";
-    }
-    
-    echo "✅ 成功读取目标文件，大小: " . strlen($dzContent) . " 字节\n\n";
-    
-    // 3. 替换所有IP:端口组合
-    $ipPortPattern = '/\b(?:\d{1,3}\.){3}\d{1,3}:\d{1,5}\b/';
-    $replacedContent = preg_replace($ipPortPattern, $newIpPort, $dzContent);
-    
-    // 4. 保存结果到文件
-    $outputFilename = "proxy-result-" . date('Y-m-d-H-i-s') . ".txt";
-    file_put_contents($outputFilename, $replacedContent);
-    
-    // 5. 生成简要报告
-    $originalCount = preg_match_all($ipPortPattern, $dzContent);
-    $replacedCount = preg_match_all($ipPortPattern, $replacedContent);
-    
-    $output = "=== 代理替换完成 ===\n";
-    $output .= "完成时间: " . date('Y-m-d H:i:s') . "\n";
-    $output .= "使用的有效代理: {$newIpPort}\n";
-    $output .= "原文件IP数量: {$originalCount}\n";
-    $output .= "替换后IP数量: {$replacedCount}\n";
-    $output .= "输出文件: {$outputFilename}\n\n";
-    $output .= "=== 文件预览（前500字符） ===\n";
-    $output .= substr($replacedContent, 0, 500) . "\n...\n";
-    
-    return $output;
-}
-
-// 执行主逻辑
-try {
-    date_default_timezone_set('Asia/Shanghai');
-    $result = replaceAndOutput();
-    echo $result;
-    
-    // 退出代码：0=成功，1=失败
-    exit(0);
-} catch (Exception $e) {
-    echo "❌ 脚本执行出错: " . $e->getMessage() . "\n";
-    exit(1);
-}
-?>
-PHP
-          echo "✅ PHP脚本创建完成"
-        else
-          echo "✅ 使用现有的proxy-checker.php脚本"
-        fi
-
-    # 步骤5：运行PHP脚本
-    - name: 🚀 执行代理检测脚本
-      run: |
-        echo "开始执行PHP代理检测脚本..."
         cd scripts
         php proxy-checker.php
-        
-        # 检查生成的结果文件
-        result_files=$(ls ../proxy-result-*.txt 2>/dev/null | wc -l)
-        if [ $result_files -gt 0 ]; then
-          echo "✅ 检测到 $result_files 个结果文件"
-          ls -la ../proxy-result-*.txt
-        else
-          echo "⚠️ 未生成结果文件，可能是没有找到有效代理"
-        fi
 
-    # 步骤6：保存结果文件
-    - name: 💾 保存结果文件
-      if: always()
+    - name: 💾 保存结果
+      if: success()
       uses: actions/upload-artifact@v3
       with:
         name: proxy-results
         path: |
           proxy-result-*.txt
-          scripts/proxy-checker.php
-        retention-days: 7
-
-    # 步骤7：提交更改到仓库（可选）
-    - name: 📝 提交结果到GitHub
-      if: success()
-      run: |
-        # 检查是否有新的结果文件
-        if ls proxy-result-*.txt 1> /dev/null 2>&1; then
-          echo "📁 检测到新的结果文件，准备提交..."
-          
-          # 配置Git用户
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # 添加结果文件
-          git add proxy-result-*.txt
-          
-          # 检查是否有变更需要提交
-          if ! git diff --cached --quiet; then
-            # 生成提交信息
-            result_count=$(ls proxy-result-*.txt | wc -l)
-            commit_time=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')
-            commit_message="🤖 自动更新代理结果 - 找到 $result_count 个有效代理 ($commit_time)"
-            
-            # 提交并推送
-            git commit -m "$commit_message"
-            git push origin main
-            echo "✅ 结果文件已提交到仓库"
-          else
-            echo "⚡ 没有检测到文件变更，跳过提交"
-          fi
-        else
-          echo "⚡ 没有生成新的结果文件，跳过提交"
-        fi
-
-    # 步骤8：发送通知（可选）
-    - name: 📧 发送执行结果通知
-      if: always()
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const fs = require('fs');
-          let resultFiles = [];
-          try {
-            resultFiles = fs.readdirSync('.').filter(file => file.startsWith('proxy-result-'));
-          } catch (e) {
-            console.log('无法读取结果文件');
-          }
-          
-          const success = process.env.JOB_STATUS === 'success';
-          const resultCount = resultFiles.length;
-          const status = success ? '✅ 成功' : '❌ 失败';
-          const emoji = success ? '🎉' : '😞';
-          
-          const message = `
-          ${emoji} **代理检测工作流执行完成** ${emoji}
-          
-          **状态**: ${status}
-          **时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
-          **生成文件**: ${resultCount} 个结果文件
-          ${resultCount > 0 ? `**最新文件**: ${resultFiles[resultFiles.length-1]}` : ''}
-          
-          查看详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          `;
-          
-          console.log(message);
-          
-          // 可以在这里添加邮件、Slack、Discord等通知集成
-          // 例如使用 Discord Webhook:
-          // if (process.env.DISCORD_WEBHOOK) {
-          //   require('axios').post(process.env.DISCORD_WEBHOOK, { content: message });
-          // }
-      env:
-        JOB_STATUS: ${{ job.status }}
